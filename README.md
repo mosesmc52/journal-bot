@@ -1,2 +1,5 @@
 # samanth-journal-bot
-Create a Chatbot to assist me with journaling
+Samantha is a chatbot to help me with journaling my life
+
+### Run Locally
+python bot.py
