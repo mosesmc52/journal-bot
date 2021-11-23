@@ -1,10 +1,24 @@
+import os
 from datetime import datetime, timedelta
 import json
-import os
 from flask import Flask, request
 from dotenv import load_dotenv
+from celery import Celery
+import sqlalchemy
+from sqlalchemy import orm
+import models
 
+from google_drive import ( GoogleDrive )
+
+# load environmental variables
 load_dotenv('.env')
+
+# load google drive instance
+goog_drive = GoogleDrive(os.getenv('SERVICE_ACCOUNT_FILE'))
+
+# open sqllite db
+engine = sqlalchemy.create_engine('sqlite:///journal.db')
+db_session = orm.Session(bind=engine)
 
 app = Flask(__name__)
 
