@@ -24,7 +24,7 @@ app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def helloworld():
-	return 'Hi, I\'m Samantha. I help you remember your life.'
+	return 'Hi, I\'m {}. I help you remember your life.'.format(os.getenv('BOT_NAME'))
 
 @app.route('/greeting', methods=['POST'])
 def greeting():
