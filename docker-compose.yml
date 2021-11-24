@@ -1,12 +1,10 @@
 version: '3.8'
 
-services:
-  nginx:
-    build: ./nginx
+  redis:
+    container_name: redis_dev_container
+    image: redis
     ports:
-      - 80:80
-    depends_on:
-      - web
+      - "6379:6379"
 
   web:
     build: .
@@ -15,3 +13,13 @@ services:
       - 5000
     env_file:
       - ./.env
+    depends_on:
+        - redis
+
+services:
+  nginx:
+    build: ./nginx
+    ports:
+      - 80:80
+    depends_on:
+      - web
