@@ -5,9 +5,6 @@ import json
 from flask import Flask, request
 from dotenv import load_dotenv
 
-from celery import Celery
-from celery.schedules import crontab
-
 import openai
 
 from conversation import ( Conversation )
@@ -29,41 +26,6 @@ if os.getenv('SENTRY_DSN', None):
 	import sentry_sdk
 	from sentry_sdk import capture_exception
 	sentry_sdk.init(dsn=os.getenv('SENTRY_DSN'))
-
-  # Add Redis URL configurations
-if os.getenv('CELERY_BROKER_URL', None):
-	from celery import Celery
-	import redis
-	app.config["CELERY_BROKER_URL"] =  os.getenv('CELERY_BROKER_URL', None)
-	app.config["CELERY_RESULT_BACKEND"] =  os.getenv('CELERY_BROKER_URL', None)
-
-	# Connect Redis db
-	#redis_db = redis.Redis(
-	#  host="redis", port="6379", db=1, charset="utf-8", decode_responses=True
-	#)
-
-	# Initialize timer in Redis
-	#redis_db.mset({"minute": 0, "second": 0})
-
-	# Add periodic tasks
-	celery_beat_schedule = {
-	    "evening-checkin": {
-	        "task": "app.evening_checkin",
-	        "schedule": 5 #crontab(hour=7, minute=0)
-	    }
-	}
-
-	# Initialize Celery and update its config
-	celery = Celery(app.name)
-	celery.conf.update(
-		result_backend=app.config["CELERY_RESULT_BACKEND"],
-		broker_url=app.config["CELERY_BROKER_URL"],
-		timezone="UTC",
-		task_serializer="json",
-		accept_content=["json"],
-		result_serializer="json",
-		beat_schedule=celery_beat_schedule,
-	)
 
 @app.route('/', methods=['GET'])
 def helloworld():
@@ -296,12 +258,15 @@ def prompt():
 		'Describe your thoughts on life after death.',
 		'What are your feeling about contraception?',
 		'Feminism?',
+		'Are you pro-life or pro-choice? Why?',
+		'What\'s more important talent or hard work',
+		'How much control do you think you have over your fate?',
+		'Describe your relax routine.',
+		'How strong is your faith in your government or community?',
+		'What\'s your opinion on patriotism?',
+		'How cometitive are you? Do you tink you need to change that? What made you this way?',
+		'When was the last time you thought you would fail, but you ultimately succeeded? What message would you give to your detractors?'
 	]
-
-@celery.task
-def evening_checkin():
-	print('checkin')
-
 
 if __name__ == '__main__':
 	app.run()

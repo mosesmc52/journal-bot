@@ -18,6 +18,7 @@ sentry-sdk = "*"
 redis = "*"
 gspread = "*"
 openai = "*"
+flower = "*"
 
 [requires]
 python_version = "3.8"
