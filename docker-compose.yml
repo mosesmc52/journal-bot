@@ -1,7 +1,7 @@
 version: '3.8'
 
-  redis:
-    image: redis:6-alpine
+redis:
+  image: redis:6-alpine
 
 services:
   nginx:
