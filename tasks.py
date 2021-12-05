@@ -4,7 +4,6 @@ Twillio Studio API: https://www.twilio.com/docs/studio/rest-api/execution
 '''
 
 import os
-import json
 import random
 
 from celery import Celery
@@ -29,8 +28,8 @@ FROM_PHONE = os.environ.get('FROM_PHONE', '')
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
 
-TWILIO_CHECKIN_FLOW_ID = os.environ.get('TWILIO_CHECKIN_FLOW', '')
-TWILIO_REFLECTION_FLOW_ID = os.environ.get('TWILIO_REFLECTION_FLOW', '')
+TWILIO_CHECKIN_FLOW_ID = os.environ.get('TWILIO_CHECKIN_FLOW_ID', '')
+TWILIO_REFLECTION_FLOW_ID = os.environ.get('TWILIO_REFLECTION_FLOW_ID', '')
 
 
 conversation = Conversation(service_account_file = os.getenv('SERVICE_ACCOUNT_FILE'), drive_folder_parent_id = os.getenv('GOOGLE_DRIVE_PARENT_FOLDER_ID'))
@@ -77,7 +76,7 @@ def daily_checkin():
 	                  .create(
 					  		to=TO_PHONE,
 					  		from_=FROM_PHONE,
-							parameters=json.loads({'message': messages[random_index]}))
+							parameters={'message': messages[random_index]})
 
 	return True
 
@@ -100,6 +99,6 @@ def reflection():
 	                  .create(
 					  		to=TO_PHONE,
 					  		from_=FROM_PHONE,
-							parameters=json.loads({'message': questions[m_count].strip()}))
+							parameters={'message': questions[m_count].strip()})
 
 	return True
