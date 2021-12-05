@@ -84,27 +84,6 @@ def greeting():
 	      ]
 	    }
 
-@app.route('/share/photo', methods=['POST'])
-def share_photo():
-	memory = json.loads(request.form['Memory'])
-	period = period_of_day()
-	user_input = request.form.get('CurrentInput')
-
-
-
-@app.route('/share/audio', methods=['POST'])
-def share_audio():
-	memory = json.loads(request.form['Memory'])
-	period = period_of_day()
-	user_input = request.form.get('CurrentInput')
-
-
-@app.route('/share/video', methods=['POST'])
-def share_video():
-	memory = json.loads(request.form['Memory'])
-	period = period_of_day()
-	user_input = request.form.get('CurrentInput')
-
 @app.route('/share/experience', methods=['POST'])
 def share_experience():
 	memory = json.loads(request.form['Memory'])
