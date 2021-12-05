@@ -1,12 +1,11 @@
 version: '3.8'
-
 services:
+
   redis:
      image: "redis:alpine"
      volumes:
        - redis_data:/data
 
-services:
   nginx:
     build: ./nginx
     ports:
