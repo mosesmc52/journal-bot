@@ -1,6 +1,6 @@
 '''
 Reference:
-Twillio Studio API: https://www.twilio.com/docs/studio/rest-api/execution
+
 '''
 
 import os
@@ -27,10 +27,6 @@ FROM_PHONE = os.environ.get('FROM_PHONE', '')
 
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
-
-TWILIO_CHECKIN_FLOW_ID = os.environ.get('TWILIO_CHECKIN_FLOW_ID', '')
-TWILIO_REFLECTION_FLOW_ID = os.environ.get('TWILIO_REFLECTION_FLOW_ID', '')
-
 
 conversation = Conversation(service_account_file = os.getenv('SERVICE_ACCOUNT_FILE'), drive_folder_parent_id = os.getenv('GOOGLE_DRIVE_PARENT_FOLDER_ID'))
 
@@ -65,18 +61,15 @@ def daily_checkin():
 	if not conversation.has_journaled_today():
 		# select random index from message
 		random_index = random.randint(0,len(messages)-1)
-		conversation.add_content(os.getenv('BOT_NAME'), messages[random_index], is_bot = True)
+		conversation.add_content(os.getenv('BOT_NAME'), messages[random_index], category = 'experience', is_bot = True)
 
 		# send message to studio to trigger stream of messages
 		client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-		execution = client.studio \
-	                  .v1 \
-	                  .flows(TWILIO_CHECKIN_FLOW_ID) \
-	                  .executions \
-	                  .create(
-					  		to=TO_PHONE,
-					  		from_=FROM_PHONE,
-							parameters={'message': messages[random_index]})
+		message = client.messages.create(
+                              body=messages[random_index],
+                              from_=FROM_PHONE,
+                              to=TO_PHONE
+                          )
 
 	return True
 
@@ -88,17 +81,14 @@ def reflection():
 	questions = fp.read().split('\n')
 	if m_count < len(questions):
 
-		conversation.add_content(os.getenv('BOT_NAME'), questions[m_count].strip(), is_bot = True)
+		conversation.add_content(os.getenv('BOT_NAME'), questions[m_count].strip(), category = 'reflection', is_bot = True)
 
 		# send message to studio to trigger stream of messages
 		client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-		execution = client.studio \
-	                  .v1 \
-	                  .flows(TWILIO_CHECKIN_FLOW_ID) \
-	                  .executions \
-	                  .create(
-					  		to=TO_PHONE,
-					  		from_=FROM_PHONE,
-							parameters={'message': questions[m_count].strip()})
+		message = client.messages.create(
+                              body=messages[random_index],
+                              from_=FROM_PHONE,
+                              to=TO_PHONE
+                          )
 
 	return True

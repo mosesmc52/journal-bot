@@ -84,11 +84,34 @@ def greeting():
 	      ]
 	    }
 
+@app.route('/fallback', methods=['POST'])
 @app.route('/share/experience', methods=['POST'])
 def share_experience():
 	memory = json.loads(request.form['Memory'])
 
-	answer = memory['twilio']['collected_data']['response']['answers']['response']['answer']
+
+	if memory['twilio'].get('collected_data'): # handles input after greeting
+		answer = memory['twilio']['collected_data']['response']['answers']['response']['answer']
+		if memory['twilio']['collected_data']['response']['answers']['response'].get('media', None):
+			mimetype = memory['twilio']['collected_data']['response']['answers']['response']['media']['type']
+			url  = memory['twilio']['collected_data']['response']['answers']['response']['media']['url']
+			conversation.add_media(url = url, mimetype = mimetype)
+
+		category = memory.get('category','experience')
+	else: # handles fallback input
+		answer = request.form.get('CurrentInput')
+		if memory.get('media', None):
+			mimetype = memory['media']['type']
+			url  = memory['media']['url']
+			conversation.add_media(url = url, mimetype = mimetype)
+
+		latest_message = conversation.latest_message()
+		if latest_message:
+			category = latest_message.category or 'experience'
+		else:
+			category = 'experience'
+
+
 	if answer.lower() in ['no', 'nothing','none'] or hasPhrase(phrases = ['nothing else', 'i\'m good'], text = answer.lower()):
 		message =  "Thanks for sharing. Talk to you later"
 		return {
@@ -99,15 +122,10 @@ def share_experience():
 					]
 				}
 
-	conversation.add_content('me', answer, category = memory.get('category','experience'))
-
-	if memory['twilio']['collected_data']['response']['answers']['response'].get('media', None):
-		mimetype = memory['twilio']['collected_data']['response']['answers']['response']['media']['type']
-		url  = memory['twilio']['collected_data']['response']['answers']['response']['media']['url']
-		conversation.add_media(url = url, mimetype = mimetype)
+	conversation.add_content('me', answer, category = category)
 
 	message = 'Is there anything else you would like to tell me?'
-	conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
+	conversation.add_content(os.getenv('BOT_NAME'), message, category = category, is_bot = True)
 
 	return {
 	      "actions": [
@@ -181,7 +199,6 @@ def gratitude():
 	}
 
 @app.route('/question', methods=['POST'])
-@app.route('/fallback', methods=['POST'])
 def openai_response():
 	user_input = request.form.get('CurrentInput')
 	conversation.add_content('me', user_input)

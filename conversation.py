@@ -104,3 +104,7 @@ class Conversation(object):
             return True
 
         return False
+
+    def latest_message(self):
+        conversation = self.db_session.query(models.Conversation).filter().order_by(sqlalchemy.desc('date')).first()
+        return conversation
