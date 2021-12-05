@@ -21,7 +21,7 @@ celery = Celery('journal-bot',
 celery_beat_schedule = {
 	"evening-checkin": {
 		"task": "evening_checkin",
-		"schedule": 5 #crontab(hour=7, minute=0)
+		"schedule": crontab(hour=7, minute=0)
 	}
 }
 
