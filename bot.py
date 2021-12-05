@@ -234,39 +234,5 @@ def openai_response():
 				]
 			}
 
-#@celery.task
-def prompt():
-	questions = [
-		'Who are you?',
-		'What are your dreams?',
-		'What thought keep you from living in the present?',
-		'What\'s your passion?',
-		'How do you feel talking about sex with others? Why do you think you feel this way?',
-		'How do you want to be remembered?',
-		'What principles do you lead your life by?',
-		'Do you believe in a higher bieng?',
-		'What\'s are your thouhgts on meditation? Are you open to trying it?',
-		'What habits do you need to let go of?',
-		'What habits should you adopt?',
-		'What is something you\'ve wanted to do, but were turned down for by friends or family? What advice did they give you?',
-		'What is your favorite book? Why did its message resonte with you?',
-		'If you were to write a book, what would it be about? What message do you want to deliver to the world?',
-		'What is the best compliment you have ever recieved? Why did it leave such a lasting impression of you? What does this tell about yourself?',
-		'How much do you trust yourself around others? How genuine are you in social settings? Describe a moment in which you were fully able to be you in a group setting?',
-		'Describe an instance where this was true for you. What advice would you give your past self now?',
-		'What makes you laugh the most?',
-		'Describe your thoughts on life after death.',
-		'What are your feeling about contraception?',
-		'Feminism?',
-		'Are you pro-life or pro-choice? Why?',
-		'What\'s more important talent or hard work',
-		'How much control do you think you have over your fate?',
-		'Describe your relax routine.',
-		'How strong is your faith in your government or community?',
-		'What\'s your opinion on patriotism?',
-		'How cometitive are you? Do you tink you need to change that? What made you this way?',
-		'When was the last time you thought you would fail, but you ultimately succeeded? What message would you give to your detractors?'
-	]
-
 if __name__ == '__main__':
 	app.run()

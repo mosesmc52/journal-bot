@@ -11,7 +11,7 @@ from google_drive import ( GoogleDrive )
 
 class Conversation(object):
 
-    def __init__(self, service_account_file, drive_folder_parent_id, history_file = './converstion.txt'):
+    def __init__(self, service_account_file, drive_folder_parent_id, history_file = './conversation.txt'):
         self.history_file = history_file
 
         # load google drive instance
@@ -90,3 +90,17 @@ class Conversation(object):
         with open(self.history_file,mode='r+') as myfile:
             all_of_it = myfile.read()
         return all_of_it
+
+    def total_messages(self, category = ''):
+        conversations = self.db_session.query(models.Conversation).filter( models.Conversation.source == 'human', models.Conversation.category == category).all()
+        if conversations:
+            return len(conversations)
+
+        return 0
+
+    def has_journaled_today(self):
+        doc = self.db_session.query(models.Doc).filter( models.Doc.name == doc_name).first()
+        if doc:
+            return True
+
+        return False
