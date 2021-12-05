@@ -1,19 +1,17 @@
 import os
 import random
-from datetime import datetime, timedelta
-import json
 
+import json
 from flask import Flask, request
 from dotenv import load_dotenv
-import sqlalchemy
-from sqlalchemy import orm
-import openai
-import gspread
 
-import models
-from google_drive import ( GoogleDrive )
+from celery import Celery
+from celery.schedules import crontab
+
+import openai
+
 from conversation import ( Conversation )
-from utils import ( period_of_day )
+from utils import ( period_of_day, hasPhrase )
 
 app = Flask(__name__)
 
@@ -24,15 +22,7 @@ load_dotenv('.env')
 # Load OpenAI Library
 openai.api_key =os.getenv('OPENAPI_API_KEY')
 
-# load google drive instance
-goog_drive = GoogleDrive(os.getenv('SERVICE_ACCOUNT_FILE'))
-goog_sheet = gspread.service_account(filename=os.getenv('SERVICE_ACCOUNT_FILE'))
-
-# open sqllite db
-engine = sqlalchemy.create_engine('sqlite:///journal.db')
-db_session = orm.Session(bind=engine)
-
-conversation = Conversation()
+conversation = Conversation(service_account_file = os.getenv('SERVICE_ACCOUNT_FILE'), drive_folder_parent_id = os.getenv('GOOGLE_DRIVE_PARENT_FOLDER_ID'))
 
 # initialize sentry
 if os.getenv('SENTRY_DSN', None):
@@ -48,15 +38,19 @@ if os.getenv('CELERY_BROKER_URL', None):
 	app.config["CELERY_RESULT_BACKEND"] =  os.getenv('CELERY_BROKER_URL', None)
 
 	# Connect Redis db
-	redis_db = redis.Redis(
-	  host="redis", port="6379", db=1, charset="utf-8", decode_responses=True
-	)
+	#redis_db = redis.Redis(
+	#  host="redis", port="6379", db=1, charset="utf-8", decode_responses=True
+	#)
 
 	# Initialize timer in Redis
-	redis_db.mset({"minute": 0, "second": 0})
+	#redis_db.mset({"minute": 0, "second": 0})
 
 	# Add periodic tasks
 	celery_beat_schedule = {
+	    "evening-checkin": {
+	        "task": "app.evening_checkin",
+	        "schedule": 5 #crontab(hour=7, minute=0)
+	    }
 	}
 
 	# Initialize Celery and update its config
@@ -70,8 +64,6 @@ if os.getenv('CELERY_BROKER_URL', None):
 		result_serializer="json",
 		beat_schedule=celery_beat_schedule,
 	)
-
-
 
 @app.route('/', methods=['GET'])
 def helloworld():
@@ -96,56 +88,156 @@ def greeting():
 		]
 	elif period == 'evening':
 		messages = [
-			'Good evening, Are you having a good time?'
+			'Good evening, How are doing?'
 		]
 
 	# select random index from message
 	random_index = random.randint(0,len(messages)-1)
-	conversation.add_content(os.getenv('BOT_NAME'), messages[random_index])
+	conversation.add_content(os.getenv('BOT_NAME'), messages[random_index], is_bot = True)
 
 	return {
-			"actions": [
-					{
-						"say": messages[random_index]
-					},
-					{
-						"remember": {
-							"first_name": first_name,
-						}
-					},
-					{
-						"listen": True
-					}
-				]
-			}
+	      "actions": [
+	        	{
+	              "collect": {
+	                  "name": "response",
+	                  "questions": [
+	                      {
+	                          "question": {
+	                              "say": messages[random_index]
+	                          },
+	                          "name": "response"
+	                      }
+	                  ],
+	                  "on_complete": {
+	                      "redirect": "task://share-experience"
+	                  }
+	              },
+	          },
+			  {
+				  "remember": {
+					  "first_name": os.getenv('MY_FIRST_NAME'),
+					  "category": 'experience'
+				  }
+			  }
+	      ]
+	    }
 
 @app.route('/share/photo', methods=['POST'])
 def share_photo():
-	pass
+	memory = json.loads(request.form['Memory'])
+	period = period_of_day()
+	user_input = request.form.get('CurrentInput')
+
+
 
 @app.route('/share/audio', methods=['POST'])
 def share_audio():
-	pass
+	memory = json.loads(request.form['Memory'])
+	period = period_of_day()
+	user_input = request.form.get('CurrentInput')
+
 
 @app.route('/share/video', methods=['POST'])
 def share_video():
-	pass
+	memory = json.loads(request.form['Memory'])
+	period = period_of_day()
+	user_input = request.form.get('CurrentInput')
 
 @app.route('/share/experience', methods=['POST'])
 def share_experience():
-	pass
+	memory = json.loads(request.form['Memory'])
+
+	answer = memory['twilio']['collected_data']['response']['answers']['response']['answer']
+	if answer.lower() in ['no', 'nothing','none'] or hasPhrase(phrases = ['nothing else', 'i\'m good'], text = answer.lower()):
+		message =  "Thanks for sharing. Talk to you later"
+		return {
+					"actions": [
+						{
+							"say": message
+						}
+					]
+				}
+
+	conversation.add_content('me', answer, category = memory.get('category','experience'))
+
+	if memory['twilio']['collected_data']['response']['answers']['response'].get('media', None):
+		mimetype = memory['twilio']['collected_data']['response']['answers']['response']['media']['type']
+		url  = memory['twilio']['collected_data']['response']['answers']['response']['media']['url']
+		conversation.add_media(url = url, mimetype = mimetype)
+
+	message = 'Is there anything else you would like to tell me?'
+	conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
+
+	return {
+	      "actions": [
+	        	{
+	              "collect": {
+	                  "name": "response",
+	                  "questions": [
+	                      {
+	                          "question": {
+	                              "say": message
+	                          },
+	                          "name": "response"
+	                      }
+	                  ],
+	                  "on_complete": {
+	                      "redirect": "task://share-experience"
+	                  }
+	              }
+				  }
+	      ]
+	    }
 
 @app.route('/share/idea', methods=['POST'])
 def share_idea():
-	pass
+	user_input = request.form.get('CurrentInput')
+	conversation.add_content('me', user_input)
+
+	message = 'Please share your idea. I\'m exicted to hear!'
+	conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
+
+	return {
+	      "actions": [
+	        	{
+	              "collect": {
+	                  "name": "response",
+	                  "questions": [
+	                      {
+	                          "question": {
+	                              "say": message
+	                          },
+	                          "name": "response"
+	                      }
+	                  ],
+	                  "on_complete": {
+	                      "redirect": "task://share-experience"
+	                  }
+	              },
+	          },
+			  {
+				  "remember": {
+					  "category": 'idea'
+				  }
+			  }
+	      ]
+	    }
 
 @app.route('/gratitude', methods=['POST'])
 def gratitude():
-	pass
+	user_input = request.form.get('CurrentInput')
+	conversation.add_content('me', user_input, category = 'gratitude')
 
-@app.route('/goal', methods=['POST'])
-def goal():
-	pass
+	message = 'Thanks for sharing. It\'s always good to be thankful!'
+	conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
+
+	return {
+		"actions": [
+			{
+				"say": message
+			}
+		]
+	}
 
 @app.route('/question', methods=['POST'])
 @app.route('/fallback', methods=['POST'])
@@ -167,7 +259,7 @@ def openai_response():
 
 	random_index = random.randint(0,len( response.choices)-1)
 	message = response.choices[random_index].text.replace('{}:'.format(os.getenv('BOT_NAME')), '')
-	conversation.add_content(os.getenv('BOT_NAME'), message)
+	conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
 
 	return {
 			"actions": [
@@ -181,16 +273,34 @@ def openai_response():
 			}
 
 #@celery.task
-#def prompt():
-#    pass
+def prompt():
+	questions = [
+		'Who are you?',
+		'What are your dreams?',
+		'What thought keep you from living in the present?',
+		'What\'s your passion?',
+		'How do you feel talking about sex with others? Why do you think you feel this way?',
+		'How do you want to be remembered?',
+		'What principles do you lead your life by?',
+		'Do you believe in a higher bieng?',
+		'What\'s are your thouhgts on meditation? Are you open to trying it?',
+		'What habits do you need to let go of?',
+		'What habits should you adopt?',
+		'What is something you\'ve wanted to do, but were turned down for by friends or family? What advice did they give you?',
+		'What is your favorite book? Why did its message resonte with you?',
+		'If you were to write a book, what would it be about? What message do you want to deliver to the world?',
+		'What is the best compliment you have ever recieved? Why did it leave such a lasting impression of you? What does this tell about yourself?',
+		'How much do you trust yourself around others? How genuine are you in social settings? Describe a moment in which you were fully able to be you in a group setting?',
+		'Describe an instance where this was true for you. What advice would you give your past self now?',
+		'What makes you laugh the most?',
+		'Describe your thoughts on life after death.',
+		'What are your feeling about contraception?',
+		'Feminism?',
+	]
 
-#@celery.task
-#def morning_checkin():
-#    pass
-
-#@celery.task
-#def evening_checkin():
-#    pass
+@celery.task
+def evening_checkin():
+	print('checkin')
 
 
 if __name__ == '__main__':

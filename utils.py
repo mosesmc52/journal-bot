@@ -17,3 +17,6 @@ def period_of_day():
     elif now.hour < 18:
         return 'afternoon'
     return 'evening'
+
+def hasPhrase(phrases = [], text = ''):
+    return any([phrase for phrase in phrases if phrase.lower() in text.lower() ])
