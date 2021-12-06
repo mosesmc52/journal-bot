@@ -78,7 +78,7 @@ class Conversation(object):
         file_name = '{}.{}'.format(datetime.now().strftime('%b-%-d-%Y-%-I-%M-%p'), mimetype.split('/')[-1])
         full_file_path = './media/{}'.format(file_name)
         open(full_file_path, 'wb').write(r.content)
-        response = goog_drive.upload_media( full_file_path, mimetype, folder.goog_id)
+        response = self.goog_drive.upload_media( full_file_path, mimetype, folder.goog_id)
         os.remove('./media/{}'.format(full_file_path))
 
         # add media  to sqllite
