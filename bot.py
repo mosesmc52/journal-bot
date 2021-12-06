@@ -84,7 +84,6 @@ def greeting():
 	      ]
 	    }
 
-@app.route('/fallback', methods=['POST'])
 @app.route('/share/experience', methods=['POST'])
 def share_experience():
 	memory = json.loads(request.form['Memory'])
@@ -226,6 +225,27 @@ def openai_response():
 					},
 					{
 						"listen": True
+					}
+				]
+			}
+
+@app.route('/fallback', methods=['POST'])
+def fallback():
+	current_input = request.form.get('CurrentInput').lower()
+	tokens = current_input.split(' ')
+	if tokens[0] in ['who', 'did', 'whose', 'which', 'where', 'when', 'why', 'how', 'what']:
+		return {
+			"actions": [
+				{
+					"redirect": "task://question"
+				}
+			]
+		}
+
+	return {
+				"actions": [
+					{
+						"redirect": "task://share-experience"
 					}
 				]
 			}
