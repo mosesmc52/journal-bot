@@ -18,6 +18,7 @@ redis = "*"
 gspread = "*"
 openai = "*"
 flower = "*"
+cached-property = "*"
 
 [requires]
 python_version = "3.8"
