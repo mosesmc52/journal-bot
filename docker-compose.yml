@@ -19,7 +19,7 @@ services:
     expose:
       - 5000
     volumes:
-      - ./journal.db:/usr/src/app/journal.db
+      - ./journal.db:/app/journal.db
     env_file:
       - ./.env
 
@@ -29,7 +29,7 @@ services:
     depends_on:
       - redis
     volumes:
-      - ./journal.db:/usr/src/app/journal.db
+      - ./journal.db:/app/journal.db
     env_file:
       - ./.env
 
@@ -37,7 +37,7 @@ services:
     build: .
     command: celery --app=tasks.celery worker -l INFO
     volumes:
-      - ./journal.db:/usr/src/app/journal.db
+      - ./journal.db:/app/journal.db
     depends_on:
       - redis
     env_file:
