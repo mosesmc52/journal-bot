@@ -5,6 +5,8 @@ FROM python:3.7-slim
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
+
+RUN mkdir /media
 WORKDIR /app
 COPY ./Pipfile ./
 COPY ./Pipfile.lock ./
