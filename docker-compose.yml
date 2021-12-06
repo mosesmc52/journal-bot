@@ -20,6 +20,7 @@ services:
       - 5000
     volumes:
       - ./journal.db:/app/journal.db
+      - ./conversation.txt:/app/conversation.txt
     env_file:
       - ./.env
 
@@ -30,6 +31,7 @@ services:
       - redis
     volumes:
       - ./journal.db:/app/journal.db
+      - ./conversation.txt:/app/conversation.txt
     env_file:
       - ./.env
 
@@ -38,6 +40,7 @@ services:
     command: celery --app=tasks.celery worker -l INFO
     volumes:
       - ./journal.db:/app/journal.db
+      - ./conversation.txt:/app/conversation.txt
     depends_on:
       - redis
     env_file:

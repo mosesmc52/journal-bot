@@ -40,8 +40,12 @@ celery = Celery('journal-bot',
 celery_beat_schedule = {
 	"evening-checkin": {
 		"task": "daily_checkin",
-		"schedule": crontab(hour=7, minute=0)
-	}
+		"schedule": crontab(hour=2, minute=0)
+	},
+	"weekly-reflection-question": {
+		"task": "reflection",
+		"schedule": crontab(hour=1, minute=0, day_of_week='sunday')
+	},
 }
 
 celery.conf.update(
