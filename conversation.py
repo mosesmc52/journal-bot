@@ -69,7 +69,7 @@ class Conversation(object):
         with open(self.history_file, "a+") as myfile:
             myfile.write('{}:{}\n'.format(speaker, message))
 
-    def add_media(url ,mimetype):
+    def add_media(self, url ,mimetype):
         folder = self._get_folder()
 
         # upload possible media
