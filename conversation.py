@@ -36,7 +36,7 @@ class Conversation(object):
         return folder
 
     def _get_day_doc(self, folder_parents_id):
-        doc_name = datetime.now().strftime('%b %-d')
+        doc_name = datetime.now().strftime('%b %-d conversation')
         doc = self.db_session.query(models.Doc).filter( models.Doc.name == doc_name).first()
         if not doc:
         	response = self.goog_drive.create_document(doc_name, folder_parents_id = folder_parents_id)
