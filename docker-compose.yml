@@ -6,7 +6,6 @@ services:
      image: "redis:alpine"
      volumes:
        - redis_data:/data
-
   nginx:
     build: ./nginx
     ports:
@@ -20,7 +19,7 @@ services:
     expose:
       - 5000
     volumes:
-      - app:/usr/src/app
+      - ./journal.db:/usr/src/app/journal.db
     env_file:
       - ./.env
 
@@ -30,7 +29,7 @@ services:
     depends_on:
       - redis
     volumes:
-      - app:/usr/src/app
+      - ./journal.db:/usr/src/app/journal.db
     env_file:
       - ./.env
 
@@ -38,7 +37,7 @@ services:
     build: .
     command: celery --app=tasks.celery worker -l INFO
     volumes:
-      - app:/usr/src/app
+      - ./journal.db:/usr/src/app/journal.db
     depends_on:
       - redis
     env_file:
@@ -58,4 +57,3 @@ services:
 
 volumes:
     redis_data:
-    app:
