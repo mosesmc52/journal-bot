@@ -201,11 +201,11 @@ def gratitude():
 def openai_response():
 	user_input = request.form.get('CurrentInput')
 	conversation.add_content('me', user_input)
-	prompt = conversation.get_entire_history()
+	#prompt = conversation.get_entire_history()
 
 	response = openai.Completion.create(
 	  engine="davinci",
-	  prompt=prompt,
+	  prompt=user_input,
 	  temperature=0.4, # This setting controls the randomness of the generated text.  0 deterministic, 1 random baby
 	  max_tokens=60,
 	  top_p=1,
@@ -217,7 +217,6 @@ def openai_response():
 	random_index = random.randint(0,len( response.choices)-1)
 	message = response.choices[random_index].text.replace('{}:'.format(os.getenv('BOT_NAME')), '')
 	conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
-
 	return {
 			"actions": [
 					{
