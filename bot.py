@@ -200,7 +200,7 @@ def gratitude():
 @app.route('/question', methods=['POST'])
 def openai_response():
 	user_input = request.form.get('CurrentInput')
-	conversation.add_content('me', user_input)
+	#conversation.add_content('me', user_input)
 	#prompt = conversation.get_entire_history()
 
 	response = openai.Completion.create(
@@ -216,7 +216,7 @@ def openai_response():
 
 	random_index = random.randint(0,len( response.choices)-1)
 	message = response.choices[random_index].text.replace('{}:'.format(os.getenv('BOT_NAME')), '')
-	conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
+	#conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
 	return {
 			"actions": [
 					{
