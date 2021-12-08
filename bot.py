@@ -34,7 +34,7 @@ def helloworld():
 @app.route('/greeting', methods=['POST'])
 def greeting():
 	memory = json.loads(request.form['Memory'])
-	period = period_of_day()
+	period = period_of_day(os.getenv('TIMEZONE'))
 	first_name = os.getenv('MY_FIRST_NAME', '')
 	user_input = request.form.get('CurrentInput')
 
@@ -123,8 +123,13 @@ def share_experience():
 
 	conversation.add_content('me', answer, category = category)
 
-	message = 'Is there anything else you would like to tell me?'
-	conversation.add_content(os.getenv('BOT_NAME'), message, category = category, is_bot = True)
+	messages = [
+				'Is there anything else you would like to tell me?',
+				'** blink ** I want to hear more. Tell me  :)'
+				]
+
+	random_index = random.randint(0,len(messages)-1)
+	conversation.add_content(os.getenv('BOT_NAME'), messages[random_index], category = category, is_bot = True)
 
 	return {
 	      "actions": [
@@ -200,12 +205,12 @@ def gratitude():
 @app.route('/question', methods=['POST'])
 def openai_response():
 	user_input = request.form.get('CurrentInput')
-	#conversation.add_content('me', user_input)
-	#prompt = conversation.get_entire_history()
+	conversation.add_content_to_tranining_data('me', user_input)
+	training_data = conversation.get_training_data()
 
 	response = openai.Completion.create(
 	  engine="davinci",
-	  prompt=user_input,
+	  prompt=training_data,
 	  temperature=0.4, # This setting controls the randomness of the generated text.  0 deterministic, 1 random baby
 	  max_tokens=60,
 	  top_p=1,
@@ -216,7 +221,8 @@ def openai_response():
 
 	random_index = random.randint(0,len( response.choices)-1)
 	message = response.choices[random_index].text.replace('{}:'.format(os.getenv('BOT_NAME')), '')
-	#conversation.add_content(os.getenv('BOT_NAME'), message, is_bot = True)
+	conversation.add_content_to_tranining_data(os.getenv('BOT_NAME'), message)
+
 	return {
 			"actions": [
 					{

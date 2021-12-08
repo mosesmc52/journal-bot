@@ -11,8 +11,8 @@ from google_drive import ( GoogleDrive )
 
 class Conversation(object):
 
-    def __init__(self, service_account_file, drive_folder_parent_id, history_file = './conversation.txt'):
-        self.history_file = history_file
+    def __init__(self, service_account_file, drive_folder_parent_id, training_data_file = './conversational-training-data.txt'):
+        self.training_data_file = training_data_file
 
         # load google drive instance
         self.goog_drive = GoogleDrive(service_account_file = service_account_file )
@@ -66,9 +66,6 @@ class Conversation(object):
         self.db_session.add(conversation)
         self.db_session.commit()
 
-        with open(self.history_file, "a+") as myfile:
-            myfile.write('{}:{}\n'.format(speaker, message))
-
     def add_media(self, url ,mimetype):
         folder = self._get_folder()
 
@@ -86,8 +83,12 @@ class Conversation(object):
         self.db_session.add(media)
         self.db_session.commit()
 
-    def get_entire_history(self):
-        with open(self.history_file,mode='r+') as myfile:
+    def add_content_to_tranining_data(self, speaker, message):
+        with open(self.training_data_file, "a+") as myfile:
+            myfile.write('{}:{}\n'.format(speaker, message))
+
+    def get_training_data(self):
+        with open(self.training_data_file, mode='r+') as myfile:
             all_of_it = myfile.read()
         return all_of_it
 

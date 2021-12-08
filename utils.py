@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 
 def hex_to_rgb(hex):
   rgb = []
@@ -8,8 +9,14 @@ def hex_to_rgb(hex):
 
   return tuple(rgb)
 
-def period_of_day():
-    now = datetime.now()
+
+def period_of_day(timezone = ''):
+    if timezone:
+        IST = pytz.timezone(timezone)
+        now = datetime.now(IST)
+    else:
+        now = datetime.now()
+
     if now.hour < 11:
         return 'morning'
     elif now.hour in [12, 13]:

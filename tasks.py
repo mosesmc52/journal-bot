@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 load_dotenv('.env')
 
 from conversation import ( Conversation )
-from utils import ( period_of_day )
 
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://127.0.0.1:6379'),
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379')
