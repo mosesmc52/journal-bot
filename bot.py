@@ -139,7 +139,7 @@ def share_experience():
 	                  "questions": [
 	                      {
 	                          "question": {
-	                              "say": message
+	                              "say": messages[random_index]
 	                          },
 	                          "name": "response"
 	                      }

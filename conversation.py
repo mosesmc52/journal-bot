@@ -100,6 +100,7 @@ class Conversation(object):
         return 0
 
     def has_journaled_today(self):
+        doc_name = datetime.now().strftime('%b %-d conversation')
         doc = self.db_session.query(models.Doc).filter( models.Doc.name == doc_name).first()
         if doc:
             return True
