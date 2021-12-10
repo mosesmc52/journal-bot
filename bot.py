@@ -238,7 +238,7 @@ def openai_response():
 def fallback():
 	current_input = request.form.get('CurrentInput').lower()
 	tokens = current_input.split(' ')
-	if tokens[0] in ['who', 'did', 'whose', 'which', 'where', 'when', 'why', 'how', 'what']:
+	if tokens[0] in ['who', 'did', 'whose', 'which', 'where', 'when', 'why', 'how', 'what'] or '?' in current_input:
 		return {
 			"actions": [
 				{
