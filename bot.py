@@ -211,12 +211,12 @@ def openai_response():
 	response = openai.Completion.create(
 	  engine="davinci",
 	  prompt=training_data,
-	  temperature=0.4, # This setting controls the randomness of the generated text.  0 deterministic, 1 random baby
-	  max_tokens=60,
+	  temperature=0.9, # This setting controls the randomness of the generated text.  0 deterministic, 1 random baby
+	  max_tokens=512,
 	  top_p=1,
-	  frequency_penalty=0.5,	# Prevents word repetitions
-	  presence_penalty=0, # Prevent topics repetitions
-	  stop=["me:"]
+	  frequency_penalty=1,	# Prevents word repetitions
+	  presence_penalty=1, # Prevent topics repetitions
+	  stop=["me:", "\n"]
 	)
 
 	random_index = random.randint(0,len( response.choices)-1)
