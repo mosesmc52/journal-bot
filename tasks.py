@@ -38,9 +38,9 @@ celery = Celery('journal-bot',
 
 # Add periodic tasks
 celery_beat_schedule = {
-	"hello": {
-		"task": "hello",
-		"schedule": crontab()
+	"heart_beat": {
+		"task": "heart_beat",
+		"schedule": crontab(minute=0)
 	},
 	"evening-checkin": {
 		"task": "daily_checkin",
@@ -101,6 +101,6 @@ def reflection():
 
 	return True
 
-@celery.task(name="hello")
-def hello():
-	return 'hello world'
+@celery.task(name="heart_beat")
+def heart_beat():
+	return 'beep'
