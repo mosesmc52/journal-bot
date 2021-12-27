@@ -1,6 +1,7 @@
 '''
 Reference:
-
+	crontab.scredules: configure
+	https://docs.celeryproject.org/en/stable/userguide/periodic-tasks.html
 '''
 
 import os
@@ -37,6 +38,10 @@ celery = Celery('journal-bot',
 
 # Add periodic tasks
 celery_beat_schedule = {
+	"hello": {
+		"task": "hello",
+		"schedule": crontab()
+	},
 	"evening-checkin": {
 		"task": "daily_checkin",
 		"schedule": crontab(hour=2, minute=0)
@@ -95,3 +100,7 @@ def reflection():
                           )
 
 	return True
+
+@celery.task(name="hello")
+def hello():
+	return 'hello world'
