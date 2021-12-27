@@ -40,15 +40,15 @@ celery = Celery('journal-bot',
 celery_beat_schedule = {
 	"heart_beat": {
 		"task": "heart_beat",
-		"schedule": crontab(minute=0)
+		"schedule": crontab(minute='*/15')
 	},
 	"evening-checkin": {
 		"task": "daily_checkin",
-		"schedule": crontab(hour=2, minute=0)
+		"schedule": crontab(hour=18, minute=0)
 	},
 	"weekly-reflection-question": {
 		"task": "reflection",
-		"schedule": crontab(hour=1, minute=0, day_of_week='sunday')
+		"schedule": crontab(hour=13, minute=0, day_of_week='sunday')
 	},
 }
 
