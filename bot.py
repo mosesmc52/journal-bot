@@ -112,7 +112,41 @@ def share_experience():
 
 
 	if answer.lower() in ['no', 'nothing','none'] or hasPhrase(phrases = ['nothing else', 'i\'m good'], text = answer.lower()):
+		conversation.add_content('me', answer, category = category)
+		if not conversation.has_journaled_today():
+			random_choice = random.randint(0,1)
+			if random_choice:
+				messages = [
+					'I want to get to know you better. Can I ask you a question?',
+				]
+				random_index = random.randint(0,len(messages)-1)
+
+				conversation.add_content(os.getenv('BOT_NAME'), messages[random_index], category = 'reflection', is_bot = True)
+				return {
+				      "actions": [
+				        	{
+				              "collect": {
+				                  "name": "response",
+				                  "questions": [
+				                      {
+				                          "question": {
+				                              "say": messages[random_index]
+				                          },
+				                          "name": "response"
+				                      }
+				                  ],
+				                  "on_complete": {
+				                      "redirect": "task://reflection-question"
+				                  }
+				              },
+				          },
+				      ]
+				    }
+
+
+
 		message =  "Thanks for sharing. Talk to you later"
+		conversation.add_content(os.getenv('BOT_NAME'), message, category = category, is_bot = True)
 		return {
 					"actions": [
 						{
@@ -233,6 +267,78 @@ def openai_response():
 					}
 				]
 			}
+
+@app.route('/reflection/question', methods=['POST'])
+def reflection_question():
+	memory = json.loads(request.form['Memory'])
+	answer = memory['twilio']['collected_data']['response']['answers']['response']['answer']
+	conversation.add_content('me', answer, category = 'reflection')
+	if hasPhrase(phrases = ['yes', 'go ahead'], text = answer.lower()):
+		question = conversation.get_reflection_question()
+
+		if question:
+			conversation.add_content(os.getenv('BOT_NAME'), question, category = 'reflection', is_bot = True)
+
+			return {
+			      "actions": [
+			        	{
+			              "collect": {
+			                  "name": "response",
+			                  "questions": [
+			                      {
+			                          "question": {
+			                              "say": question
+			                          },
+			                          "name": "response"
+			                      }
+			                  ],
+			                  "on_complete": {
+			                      "redirect": "task://reflection-response"
+			                  }
+			              },
+			          },
+			      ]
+			    }
+
+
+
+	message =  "Talk to you later"
+	conversation.add_content(os.getenv('BOT_NAME'), message, category = 'reflection', is_bot = True)
+	return {
+				"actions": [
+					{
+						"say": message
+					}
+				]
+			}
+
+@app.route('/reflection/response', methods=['POST'])
+def reflection_response():
+	# save answer
+
+	# save user response
+	memory = json.loads(request.form['Memory'])
+	answer = memory['twilio']['collected_data']['response']['answers']['response']['answer']
+
+	conversation.add_content('me', answer)
+
+	# bot response
+	messages =  [
+			"Thanks for sharing. I really enjoy learning more about you."
+	]
+	random_index = random.randint(0,len(messages)-1)
+	conversation.add_content(os.getenv('BOT_NAME'), messages[random_index], is_bot = True)
+
+	return {
+				"actions": [
+					{
+						"say": messages[random_index]
+					}
+				]
+			}
+
+
+
 
 @app.route('/fallback', methods=['POST'])
 def fallback():
