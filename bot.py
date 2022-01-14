@@ -113,7 +113,7 @@ def share_experience():
 
 	if answer.lower() in ['no', 'nothing','none'] or hasPhrase(phrases = ['nothing else', 'i\'m good'], text = answer.lower()):
 		conversation.add_content('me', answer, category = category)
-		if not conversation.has_journaled_today():
+		if not conversation.has_reflected_today():
 			random_choice = random.randint(0,1)
 			if random_choice:
 				messages = [

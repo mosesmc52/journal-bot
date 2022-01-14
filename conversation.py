@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import requests
 import sqlalchemy
-from sqlalchemy import orm
+from sqlalchemy import orm, desc
 import gspread
 
 import models
@@ -108,8 +108,17 @@ class Conversation(object):
 
 		return False
 
+	def has_reflected_today(self):
+		doc_name = datetime.now().strftime('%b %-d conversation')
+		conversation = self.db_session.query(models.Conversation).filter( models.Conversation.category == 'reflection').order_by(desc('date')).first()
+		if conversation:
+			if conversation.date.date() == datetime.now().date():
+				return True
+
+		return False
+
 	def latest_message(self):
-		conversation = self.db_session.query(models.Conversation).filter().order_by(sqlalchemy.desc('date')).first()
+		conversation = self.db_session.query(models.Conversation).filter().order_by(desc('date')).first()
 		return conversation
 
 	def get_reflection_question(self):

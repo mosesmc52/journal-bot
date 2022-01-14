@@ -83,18 +83,20 @@ def daily_checkin():
 
 @celery.task(name="reflection")
 def reflection():
-	question = conversation.get_reflection_question()
 
-	if question:
-		conversation.add_content(os.getenv('BOT_NAME'), question, category = 'reflection', is_bot = True)
+	if conversation.has_reflected_today():
+		question = conversation.get_reflection_question()
 
-		# send message to studio to trigger stream of messages
-		client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-		message = client.messages.create(
-	                          body=question,
-	                          from_=FROM_PHONE,
-	                          to=TO_PHONE
-	                      )
+		if question:
+			conversation.add_content(os.getenv('BOT_NAME'), question, category = 'reflection', is_bot = True)
+
+			# send message to studio to trigger stream of messages
+			client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+			message = client.messages.create(
+		                          body=question,
+		                          from_=FROM_PHONE,
+		                          to=TO_PHONE
+		                      )
 
 	return True
 
