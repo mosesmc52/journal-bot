@@ -300,9 +300,7 @@ def reflection_question():
 			      ]
 			    }
 
-
-
-	message =  "Talk to you later"
+	message =  "Okay, we will chat later"
 	conversation.add_content(os.getenv('BOT_NAME'), message, category = 'reflection', is_bot = True)
 	return {
 				"actions": [
