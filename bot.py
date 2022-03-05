@@ -272,7 +272,6 @@ def openai_response():
 def reflection_question():
 	memory = json.loads(request.form['Memory'])
 	answer = memory['twilio']['collected_data']['response']['answers']['response']['answer']
-	conversation.add_content('me', answer, category = 'reflection')
 	if hasPhrase(phrases = ['yes', 'go ahead'], text = answer.lower()):
 		question = conversation.get_reflection_question()
 
@@ -301,7 +300,7 @@ def reflection_question():
 			    }
 
 	message =  "Okay, we will chat later"
-	conversation.add_content(os.getenv('BOT_NAME'), message, category = 'reflection', is_bot = True)
+
 	return {
 				"actions": [
 					{
