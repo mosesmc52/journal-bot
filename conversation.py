@@ -128,6 +128,9 @@ class Conversation(object):
 		with open(self.reflection_question_data_file, "r") as fp:
 			questions = fp.read().split('\n')
 
+			# remove empty strings
+			questions = list(filter(None, questions))
+
 			if m_count < len(questions):
 				return questions[m_count].strip()
 
