@@ -61,19 +61,20 @@ def greeting():
     actions = []
     if os.getenv("GIPHY_GREETING_QUERY"):  # include greeting query if it exist
         gif = conversation.get_random_glphy_gif(query=os.getenv("GIPHY_GREETING_QUERY"))
-        actions.append(
-            {
-                "show": {
-                    "body": "",
-                    "images": [
-                        {
-                            "label": "",
-                            "url": gif,
-                        }
-                    ],
+        if gif:
+            actions.append(
+                {
+                    "show": {
+                        "body": "",
+                        "images": [
+                            {
+                                "label": "",
+                                "url": gif,
+                            }
+                        ],
+                    }
                 }
-            }
-        )
+            )
 
     actions.append(
         {

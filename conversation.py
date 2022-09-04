@@ -17,7 +17,7 @@ class Conversation(object):
         self,
         service_account_file,
         drive_folder_parent_id,
-        glphy_api_key,
+        glphy_api_key="",
         training_data_file="./conversational-training-data.txt",
         reflection_question_data_file="reflection-questions.txt",
     ):
@@ -38,6 +38,8 @@ class Conversation(object):
         self.GLIPHY_LIMIT = 100
 
     def get_random_glphy_gif(self, query):
+        if not self.glphy_api_key:
+            return ""
 
         random_limit = random.randint(0, self.GLIPHY_LIMIT)
         random_offset = random.randint(0, self.GLIPHY_MAX_OFFSET)
@@ -48,6 +50,7 @@ class Conversation(object):
             )
         except GiphyApiException as e:
             print("Exception when calling DefaultApi->gifs_search_get: %s\n" % e)
+            return ""
 
         return response.data[0].images.fixed_height.url
 
