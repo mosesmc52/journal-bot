@@ -1,6 +1,7 @@
 import json
 import os
 import random
+from datetime import datetime
 
 import openai
 from conversation import Conversation
@@ -63,7 +64,11 @@ def greeting():
         "GIPHY_GREETING_QUERY"
     ):  # include greeting query if it exist
         gif = conversation.get_random_glphy(
-            query="{} {}".format(period, os.getenv("GIPHY_GREETING_QUERY"))
+            query="{} {} {}".format(
+                period,
+                datetime.now().strftime("%A").lower(),
+                os.getenv("GIPHY_GREETING_QUERY"),
+            )
         )
         if gif:
             actions.append(
