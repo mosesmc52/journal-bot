@@ -181,7 +181,28 @@ def share_experience():
         conversation.add_content(
             os.getenv("BOT_NAME"), message, category=category, is_bot=True
         )
-        return {"actions": [{"say": message}]}
+
+        actions = []
+        if random.choice([True, False]) and os.getenv("GIPHY_BYE_QUERY"):
+            gif = conversation.get_random_glphy(query=os.getenv("GIPHY_BYE_QUERY"))
+            if gif:
+                actions.append(
+                    {
+                        "show": {
+                            "body": "",
+                            "images": [
+                                {
+                                    "label": "",
+                                    "url": gif,
+                                }
+                            ],
+                        }
+                    }
+                )
+
+        actions.append({"say": message})
+
+        return {"actions": actions}
 
     conversation.add_content("me", answer, category=category)
 
