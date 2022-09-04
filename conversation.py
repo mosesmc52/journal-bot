@@ -2,10 +2,12 @@ import os
 import random
 from datetime import datetime, timedelta
 
+import giphy_client
 import gspread
 import models
 import requests
 import sqlalchemy
+from giphy_client.rest import ApiException as GiphyApiException
 from google_drive import GoogleDrive
 from sqlalchemy import desc, orm
 
@@ -15,6 +17,7 @@ class Conversation(object):
         self,
         service_account_file,
         drive_folder_parent_id,
+        glphy_api_key,
         training_data_file="./conversational-training-data.txt",
         reflection_question_data_file="reflection-questions.txt",
     ):
@@ -29,6 +32,24 @@ class Conversation(object):
         # open sqllite db
         engine = sqlalchemy.create_engine("sqlite:///journal.db")
         self.db_session = orm.Session(bind=engine)
+        self.glphy_api = giphy_client.DefaultApi()
+        self.glphy_api_key = glphy_api_key
+        self.GLIPHY_MAX_OFFSET = 100
+        self.GLIPHY_LIMIT = 100
+
+    def _get_random_glphy_gif(self, query):
+
+        random_limit = random.randint(0, self.GLIPHY_LIMIT)
+        random_offset = random.randint(0, self.GLIPHY_MAX_OFFSET)
+
+        try:
+            response = self.glphy_api.gifs_search_get(
+                self.glphy_api_key, query, limit=random_limit, offset=random_offset
+            )
+        except GiphyApiException as e:
+            print("Exception when calling DefaultApi->gifs_search_get: %s\n" % e)
+
+        return response.data[0].images.fixed_height.url
 
     def _get_folder(self):
         folder_name = datetime.now().strftime("%b %y")

@@ -19,6 +19,7 @@ gspread = "*"
 openai = "*"
 flower = "*"
 cached-property = "*"
+giphy-client = "*"
 
 [requires]
 python_version = "3.8"
