@@ -20,6 +20,7 @@ openai = "*"
 flower = "*"
 cached-property = "*"
 giphy-client = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.8"
