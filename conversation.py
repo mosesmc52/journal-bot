@@ -37,7 +37,7 @@ class Conversation(object):
         self.GLIPHY_MAX_OFFSET = 100
         self.GLIPHY_LIMIT = 100
 
-    def _get_random_glphy_gif(self, query):
+    def get_random_glphy_gif(self, query):
 
         random_limit = random.randint(0, self.GLIPHY_LIMIT)
         random_offset = random.randint(0, self.GLIPHY_MAX_OFFSET)

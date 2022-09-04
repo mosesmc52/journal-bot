@@ -57,7 +57,7 @@ def greeting():
     # select random index from message
     random_index = random.randint(0, len(messages) - 1)
     conversation.add_content(os.getenv("BOT_NAME"), messages[random_index], is_bot=True)
-
+    gif = conversation.get_random_glphy_gif(query="Hello")
     return {
         "actions": [
             {
@@ -66,7 +66,7 @@ def greeting():
                     "images": [
                         {
                             "label": "",
-                            "url": "https://demo.twilio.com/owl.png",
+                            "url": gif,
                         }
                     ],
                 }
