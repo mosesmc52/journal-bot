@@ -59,7 +59,9 @@ def greeting():
     conversation.add_content(os.getenv("BOT_NAME"), messages[random_index], is_bot=True)
 
     actions = []
-    if os.getenv("GIPHY_GREETING_QUERY"):  # include greeting query if it exist
+    if random.choice([True, False]) and os.getenv(
+        "GIPHY_GREETING_QUERY"
+    ):  # include greeting query if it exist
         gif = conversation.get_random_glphy_gif(query=os.getenv("GIPHY_GREETING_QUERY"))
         if gif:
             actions.append(
@@ -191,22 +193,40 @@ def share_experience():
         os.getenv("BOT_NAME"), messages[random_index], category=category, is_bot=True
     )
 
-    return {
-        "actions": [
-            {
-                "collect": {
-                    "name": "response",
-                    "questions": [
-                        {
-                            "question": {"say": messages[random_index]},
-                            "name": "response",
-                        }
-                    ],
-                    "on_complete": {"redirect": "task://share-experience"},
+    actions = []
+    if random.choice([True, False]) and os.getenv("GIPHY_CURIOUS_QUERY"):
+        gif = conversation.get_random_glphy_gif(query=os.getenv("GIPHY_CURIOUS_QUERY"))
+        if gif:
+            actions.append(
+                {
+                    "show": {
+                        "body": "",
+                        "images": [
+                            {
+                                "label": "",
+                                "url": gif,
+                            }
+                        ],
+                    }
                 }
-            },
-        ]
-    }
+            )
+
+    actions.append(
+        {
+            "collect": {
+                "name": "response",
+                "questions": [
+                    {
+                        "question": {"say": messages[random_index]},
+                        "name": "response",
+                    }
+                ],
+                "on_complete": {"redirect": "task://share-experience"},
+            }
+        }
+    )
+
+    return {"actions": actions}
 
 
 @app.route("/share/idea", methods=["POST"])
