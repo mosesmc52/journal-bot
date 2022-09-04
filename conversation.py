@@ -34,7 +34,7 @@ class Conversation(object):
         self.db_session = orm.Session(bind=engine)
         self.glphy_api = giphy_client.DefaultApi()
         self.glphy_api_key = glphy_api_key
-        self.GLIPHY_MAX_OFFSET = 100
+        self.GLIPHY_MAX_OFFSET = 0
         self.GLIPHY_LIMIT = 100
 
     def get_random_glphy(self, query):
