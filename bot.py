@@ -57,9 +57,11 @@ def greeting():
     # select random index from message
     random_index = random.randint(0, len(messages) - 1)
     conversation.add_content(os.getenv("BOT_NAME"), messages[random_index], is_bot=True)
-    gif = conversation.get_random_glphy_gif(query="Hello")
-    return {
-        "actions": [
+
+    actions = []
+    if os.getenv("GIPHY_GREETING_QUERY"):  # include greeting query if it exist
+        gif = conversation.get_random_glphy_gif(query=os.getenv("GIPHY_GREETING_QUERY"))
+        actions.append(
             {
                 "show": {
                     "body": "",
@@ -70,27 +72,34 @@ def greeting():
                         }
                     ],
                 }
+            }
+        )
+
+    actions.append(
+        {
+            "collect": {
+                "name": "response",
+                "questions": [
+                    {
+                        "question": {"say": messages[random_index]},
+                        "name": "response",
+                    }
+                ],
+                "on_complete": {"redirect": "task://share-experience"},
             },
-            {
-                "collect": {
-                    "name": "response",
-                    "questions": [
-                        {
-                            "question": {"say": messages[random_index]},
-                            "name": "response",
-                        }
-                    ],
-                    "on_complete": {"redirect": "task://share-experience"},
-                },
-            },
-            {
-                "remember": {
-                    "first_name": os.getenv("MY_FIRST_NAME"),
-                    "category": "experience",
-                }
-            },
-        ]
-    }
+        }
+    )
+
+    actions.append(
+        {
+            "remember": {
+                "first_name": os.getenv("MY_FIRST_NAME"),
+                "category": "experience",
+            }
+        }
+    )
+
+    return {"actions": actions}
 
 
 @app.route("/share/experience", methods=["POST"])
