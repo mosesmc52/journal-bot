@@ -141,7 +141,7 @@ def share_experience():
             category = "experience"
 
     if answer.lower() in ["no", "nothing", "none"] or hasPhrase(
-        phrases=["nothing else", "i'm good"], text=answer.lower()
+        phrases=["nothing else", "i'm good", "bye"], text=answer.lower()
     ):
         conversation.add_content("me", answer, category=category)
         if not conversation.has_reflected_today():
