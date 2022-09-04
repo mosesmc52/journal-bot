@@ -173,6 +173,17 @@ def share_experience():
     return {
         "actions": [
             {
+                "show": {
+                    "body": "",
+                    "images": [
+                        {
+                            "label": "",
+                            "url": "https://demo.twilio.com/owl.png",
+                        }
+                    ],
+                }
+            },
+            {
                 "collect": {
                     "name": "response",
                     "questions": [
@@ -183,7 +194,7 @@ def share_experience():
                     ],
                     "on_complete": {"redirect": "task://share-experience"},
                 }
-            }
+            },
         ]
     }
 
