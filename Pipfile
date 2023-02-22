@@ -21,6 +21,7 @@ flower = "*"
 cached-property = "*"
 giphy-client = "*"
 numpy = "==1.21.0"
+python-telegram-bot = "*"
 
 [requires]
 python_version = "3.8"

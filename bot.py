@@ -4,6 +4,7 @@ import random
 from datetime import datetime
 
 import openai
+import telegram
 from conversation import Conversation
 from dotenv import load_dotenv
 from flask import Flask, request
@@ -17,6 +18,9 @@ load_dotenv(".env")
 
 # Load OpenAI Library
 openai.api_key = os.getenv("OPENAPI_API_KEY")
+
+bot = telegram.Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
+
 
 conversation = Conversation(
     service_account_file=os.getenv("SERVICE_ACCOUNT_FILE"),
