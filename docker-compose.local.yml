@@ -4,10 +4,8 @@ services:
   web:
     build: .
     command: python bot.py
-    expose:
-      - 5000
-    # volumes:
-    #   - ./journal.db:/app/journal.db
-    #   - ./conversation.txt:/app/conversation.txt
-    # env_file:
-    #   - ./.env
+    volumes:
+      - ./journal.db:/app/journal.db
+      - ./conversation.txt:/app/conversation.txt
+    env_file:
+      - ./.env
