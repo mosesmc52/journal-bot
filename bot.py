@@ -29,11 +29,11 @@ conversation = Conversation(
     drive_folder_parent_id=os.getenv("GOOGLE_DRIVE_PARENT_FOLDER_ID"),
 )
 
-CHOOSING, TYPING_REPLY, TYPING_CHOICE, PHOTO, AUDIO = range(5)
+CHOOSING, TYPING_REPLY, TYPING_CHOICE, PHOTO = range(4)
 
 reply_keyboard = [
     ["Share an Experience", "Share a Thought", "Share a Photo"],
-    ["Express Gratitude", "Answer a Reflection Question"],
+    ["Answer a Reflection Question"],
     ["Done"],
 ]
 
@@ -186,7 +186,7 @@ def main() -> None:
             ],
         },
         fallbacks=[MessageHandler(filters.Regex("^bye$"), done)],
-        name="my_conversation",
+        name="journal-bot",
         persistent=True,
     )
     application.add_handler(conv_handler)
