@@ -30,7 +30,7 @@ class Conversation(object):
         self.drive_folder_parent_id = drive_folder_parent_id
 
         # open sqllite db
-        engine = sqlalchemy.create_engine("sqlite:///journal.db")
+        engine = sqlalchemy.create_engine("sqlite:///journal.sqlite")
         self.db_session = orm.Session(bind=engine)
         self.glphy_api = giphy_client.DefaultApi()
         self.glphy_api_key = glphy_api_key

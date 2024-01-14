@@ -33,7 +33,7 @@ CHOOSING, TYPING_REPLY, TYPING_CHOICE, PHOTO = range(4)
 
 reply_keyboard = [
     ["Share an Experience", "Share a Thought", "Share a Photo"],
-    ["Answer a Reflection Question"],
+    ["Answer a Reflection Question", "Talk Later"],
     ["Done"],
 ]
 
@@ -126,7 +126,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return CHOOSING
 
 
-def reflection_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reflection_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = conversation.get_reflection_question()
     conversation.add_content(
         os.getenv("BOT_NAME"), question, category="reflection", is_bot=True
@@ -134,6 +134,26 @@ def reflection_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(question)
     return TYPING_REPLY
+
+
+async def initiate_conversation(context: ContextTypes.DEFAULT_TYPE) -> None:
+    job = context.job
+    await context.bot.send_message(
+        job.chat_id, text=f"Beep! {job.data} seconds are over!"
+    )
+
+
+async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_message.chat_id
+    future_day = 24 * 60 * 60  # 1 day in seconds
+
+    context.job_queue.run_once(
+        initiate_conversation, future_day, chat_id=chat_id, name=str(chat_id), data=due
+    )
+    reply_text = "Great! Let's talk tomorrow."
+    conversation.add_content(os.getenv("BOT_NAME"), reply_text)
+
+    await update.effective_message.reply_text(reply_text)
 
 
 async def done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
