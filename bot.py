@@ -19,6 +19,7 @@ from utils import period_of_day
 
 def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Remove job with given name. Returns whether job was removed."""
+
     current_jobs = context.job_queue.get_jobs_by_name(name)
     if not current_jobs:
         return False
@@ -54,8 +55,6 @@ markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 def greeting():
     period = period_of_day(os.getenv("TIMEZONE"))
 
-    # conversation.add_content("me", user_input)
-
     if period == "morning":
         messages = ["Morning, *smile* How are you doing luv?"]
     elif period in ["noon", "afternoon"]:
@@ -71,8 +70,7 @@ def greeting():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     chat_id = update.effective_message.chat_id
 
-    if chat_id:
-        remove_job_if_exists(str(chat_id), context)
+    remove_job_if_exists(str(chat_id), context)
 
     reply_text = f"Hi {update.effective_user.first_name}, I'm { os.getenv('BOT_NAME') }. I'm here to help you keep track of your memories in life. Tell me what do you want to share"
 
