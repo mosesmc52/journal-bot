@@ -9,7 +9,7 @@ packages = [{include = "journal_bot"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 gspread = "^5.12.2"
-python-telegram-bot = "^20.7"
+python-telegram-bot = {extras = ["job-queue"], version = "^20.7"}
 python-dotenv = "^1.0.0"
 requests = "^2.31.0"
 gunicorn = "^21.2.0"
