@@ -7,5 +7,6 @@ services:
     volumes:
       - ./journal.db:/app/journal.db
       - ./conversation.txt:/app/conversation.txt
+      - ./service-account.json:/app/service-account.json
     env_file:
       - ./.env
