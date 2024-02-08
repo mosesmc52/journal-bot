@@ -203,6 +203,7 @@ def main() -> None:
         entry_points=[
             CommandHandler(os.getenv("BOT_NAME"), start),
             CommandHandler("hi", start),
+            CommandHandler("start", start),
         ],
         states={
             CHOOSING: [
