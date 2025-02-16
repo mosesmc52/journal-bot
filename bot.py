@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+from datetime import datetime, timedelta
 
 from conversation import Conversation
 from dotenv import load_dotenv
@@ -157,16 +158,20 @@ async def initiate_conversation(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_message.chat_id
-    future_day = 24 * 60 * 60  # 1 day in seconds
+    now = datetime.now()
+    tomorrow_at_hour = (now + timedelta(days=1)).replace(
+        hour=6, minute=0, second=0, microsecond=0
+    )
+    seconds_difference = int((tomorrow_at_hour - now).total_seconds())
 
     context.job_queue.run_once(
         initiate_conversation,
         future_day,
         chat_id=chat_id,
         name=str(chat_id),
-        data=future_day,
+        data=seconds_difference,
     )
-    reply_text = "Great! Let's talk tomorrow."
+    reply_text = "Great! Let's talk tomorrow at 6pm."
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
 
     await update.effective_message.reply_text(reply_text)
