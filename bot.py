@@ -166,7 +166,7 @@ async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.job_queue.run_once(
         initiate_conversation,
-        future_day,
+        seconds_difference,
         chat_id=chat_id,
         name=str(chat_id),
         data=seconds_difference,
