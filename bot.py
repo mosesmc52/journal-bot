@@ -160,7 +160,7 @@ async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_message.chat_id
     now = datetime.now()
     tomorrow_at_hour = (now + timedelta(days=1)).replace(
-        hour=6, minute=0, second=0, microsecond=0
+        hour=23, minute=0, second=0, microsecond=0
     )
     seconds_difference = int((tomorrow_at_hour - now).total_seconds())
 
