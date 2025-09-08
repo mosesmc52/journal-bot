@@ -1,7 +1,7 @@
 import logging
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from conversation import Conversation
 from dotenv import load_dotenv
@@ -17,24 +17,12 @@ from telegram.ext import (
 )
 from utils import period_of_day
 
+# ----------------------- Setup & Config -----------------------
 
-def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Remove job with given name. Returns whether job was removed."""
-
-    current_jobs = context.job_queue.get_jobs_by_name(name)
-    if not current_jobs:
-        return False
-    for job in current_jobs:
-        job.schedule_removal()
-    return True
-
-
-# Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-# load environmental variables
 load_dotenv(".env")
 
 conversation = Conversation(
@@ -49,35 +37,139 @@ reply_keyboard = [
     ["Answer a Reflection Question", "Talk Tomorrow"],
     ["Bye"],
 ]
+markup = ReplyKeyboardMarkup(
+    reply_keyboard, one_time_keyboard=True, resize_keyboard=True
+)
 
-markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+
+# ----------------------- Helpers -----------------------
+
+
+def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    jobs = context.job_queue.get_jobs_by_name(name)
+    if not jobs:
+        return False
+    for job in jobs:
+        job.schedule_removal()
+    return True
+
+
+# Short, friendly prompts (time-aware + anytime)
+MORNING_PROMPTS = [
+    "What’s up today?",
+    "One small win you want?",
+    "How did you sleep?",
+    "What would make today feel good?",
+    "What’s your vibe this morning?",
+]
+AFTERNOON_PROMPTS = [
+    "How’s your day going?",
+    "Anything interesting happen?",
+    "What took energy? What gave it?",
+    "What’s one thing you’re proud of?",
+    "What surprised you?",
+]
+EVENING_PROMPTS = [
+    "How’d the day go?",
+    "Highlight of today?",
+    "Tough moment? How’d you handle it?",
+    "What are you grateful for?",
+    "What will you tweak tomorrow?",
+]
+ANYTIME_CHECKINS = [
+    "Right now I feel… (one word + why)",
+    "Energy 1–5? What would raise it by 1?",
+    "Need more of ___ / less of ___?",
+    "One sentence you’d send future‑you?",
+    "What’s one 5‑minute task you can finish?",
+]
+
+SUGGESTED_TAGS = ["#win", "#mood", "#gratitude", "#note", "#focus"]
+
+
+def pick_timebox_prompts():
+    p = period_of_day(os.getenv("TIMEZONE"))
+    if p == "morning":
+        base = MORNING_PROMPTS
+    elif p in ("noon", "afternoon"):
+        base = AFTERNOON_PROMPTS
+    else:
+        base = EVENING_PROMPTS
+    prompts = random.sample(base, k=2) + [random.choice(ANYTIME_CHECKINS)]
+    random.shuffle(prompts)
+    return prompts
+
+
+def format_daily_prompt(first_name: str) -> str:
+    today = datetime.now().strftime("%b %d")
+    prompts = pick_timebox_prompts()
+    tags = " ".join(random.sample(SUGGESTED_TAGS, k=3))
+    return (
+        f"📝 *Daily Journal* — {today}\n"
+        f"Hi {first_name}, quick check‑in:\n\n"
+        f"1) {prompts[0]}\n"
+        f"2) {prompts[1]}\n"
+        f"3) {prompts[2]}\n\n"
+        f"_Tags:_ {tags}"
+    )
 
 
 def greeting():
-    period = period_of_day(os.getenv("TIMEZONE"))
+    p = period_of_day(os.getenv("TIMEZONE"))
+    if p == "morning":
+        return random.choice(
+            ["Morning! How’s it going?", "Hey—did you sleep okay?", "What’s up today?"]
+        )
+    elif p in ["noon", "afternoon"]:
+        return random.choice(
+            [
+                "Hey, how’s your day?",
+                "What’s been going on?",
+                "Got a minute to check in?",
+            ]
+        )
+    else:
+        return random.choice(
+            [
+                "Evening! How’d the day go?",
+                "How are you feeling tonight?",
+                "Quick check‑in?",
+            ]
+        )
 
-    if period == "morning":
-        messages = ["Morning, *smile* How are you doing luv?"]
-    elif period in ["noon", "afternoon"]:
-        messages = ["Good to hear from you, *smile* How are you doing luv?"]
-    elif period == "evening":
-        messages = ["Good evening, How are doing?"]
 
-    random_index = random.randint(0, len(messages) - 1)
-
-    return messages[random_index]
+# ----------------------- Handlers -----------------------
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     chat_id = update.effective_message.chat_id
-
     remove_job_if_exists(str(chat_id), context)
 
-    reply_text = f"Hi {update.effective_user.first_name}, I'm { os.getenv('BOT_NAME') }. I'm here to help you keep track of your memories in life. Tell me what do you want to share"
-
+    reply_text = (
+        f"Hey {update.effective_user.first_name}, I’m {os.getenv('BOT_NAME')} 🙂 "
+        "Want to share anything from today?"
+    )
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text, reply_markup=markup)
 
+    # also send today’s prompt (short & friendly)
+    prompt_text = format_daily_prompt(update.effective_user.first_name)
+    conversation.add_content(
+        os.getenv("BOT_NAME"), prompt_text, is_bot=True, category="prompt"
+    )
+    await update.message.reply_text(prompt_text, parse_mode="Markdown")
+
+    return CHOOSING
+
+
+async def send_today_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    prompt_text = format_daily_prompt(update.effective_user.first_name)
+    conversation.add_content(
+        os.getenv("BOT_NAME"), prompt_text, is_bot=True, category="prompt"
+    )
+    await update.message.reply_text(
+        prompt_text, parse_mode="Markdown", reply_markup=markup
+    )
     return CHOOSING
 
 
@@ -85,38 +177,31 @@ async def received_information(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     answer = update.message.text
-
     conversation.add_content("me", answer)
 
-    reply_text = "Neat! ** blink ** I want to hear more. :). Is there anything else you would like to tell me?"
-
+    reply_text = "Got it 😊 Add anything else?"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
-    await update.message.reply_text(
-        reply_text,
-        reply_markup=markup,
-    )
+    await update.message.reply_text(reply_text, reply_markup=markup)
 
     return CHOOSING
 
 
 async def share_experience(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    reply_text = f"How is your day going? ** smile ** :)"
+    reply_text = "How’s your day been?"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text)
-
     return TYPING_REPLY
 
 
 async def share_thought(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    reply_text = f"Hit me! What are you thinking?"
+    reply_text = "What’s on your mind?"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text)
-
     return TYPING_REPLY
 
 
 async def share_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    reply_text = f"Oh, photos. I want to see."
+    reply_text = "Nice! Send it over 📷"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text)
     return PHOTO
@@ -124,45 +209,45 @@ async def share_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     photo_file = await update.message.photo[-1].get_file()
-
     conversation.add_media(photo_file.file_path, "image/jpeg")
 
-    reply_text = "Wow, Gorgeous! Is there anything else you would like to tell me?"
-
+    reply_text = "Love it! Want to add a few words?"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
-    await update.message.reply_text(
-        reply_text,
-        reply_markup=markup,
-    )
-
+    await update.message.reply_text(reply_text, reply_markup=markup)
     return CHOOSING
 
 
 async def reflection_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    question = conversation.get_reflection_question()
+    curated = MORNING_PROMPTS + AFTERNOON_PROMPTS + EVENING_PROMPTS + ANYTIME_CHECKINS
+    question = random.choice(curated)
+    text = f"Here’s one:\n\n{question}"
     conversation.add_content(
-        os.getenv("BOT_NAME"), question, category="reflection", is_bot=True
+        os.getenv("BOT_NAME"), text, category="reflection", is_bot=True
     )
-
-    await update.message.reply_text(question)
+    await update.message.reply_text(text)
     return TYPING_REPLY
 
 
 async def initiate_conversation(context: ContextTypes.DEFAULT_TYPE) -> None:
     job = context.job
+    hello = greeting()
+    await context.bot.send_message(job.chat_id, text=hello, reply_markup=markup)
 
-    reply_text = greeting()
-    await context.bot.send_message(job.chat_id, text=reply_text, reply_markup=markup)
-    return CHOOSING
+    prompt_text = format_daily_prompt(first_name="there")
+    conversation.add_content(
+        os.getenv("BOT_NAME"), prompt_text, is_bot=True, category="prompt"
+    )
+    await context.bot.send_message(job.chat_id, text=prompt_text, parse_mode="Markdown")
 
 
 async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # schedule tomorrow at 6:00 PM local
     chat_id = update.effective_message.chat_id
     now = datetime.now()
-    tomorrow_at_hour = (now + timedelta(days=1)).replace(
-        hour=23, minute=0, second=0, microsecond=0
+    target = (now + timedelta(days=1)).replace(
+        hour=18, minute=0, second=0, microsecond=0
     )
-    seconds_difference = int((tomorrow_at_hour - now).total_seconds())
+    seconds_difference = int((target - now).total_seconds())
 
     context.job_queue.run_once(
         initiate_conversation,
@@ -171,27 +256,21 @@ async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name=str(chat_id),
         data=seconds_difference,
     )
-    reply_text = "Great! Let's talk tomorrow at 6pm."
+    reply_text = "Cool—I’ll check in tomorrow at 6pm 😊"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
-
     await update.effective_message.reply_text(reply_text)
 
 
 async def done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Display the gathered info and end the conversation."""
     user_data = context.user_data
-    messages = ["Thanks for sharing. I really enjoy learning more about you."]
-    random_index = random.randint(0, len(messages) - 1)
-    reply_text = messages[random_index]
+    reply_text = "Thanks for sharing. Talk soon 👋"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
-    await update.message.reply_text(
-        reply_text,
-        reply_markup=ReplyKeyboardRemove(),
-    )
-
+    await update.message.reply_text(reply_text, reply_markup=ReplyKeyboardRemove())
     user_data.clear()
-
     return ConversationHandler.END
+
+
+# ----------------------- App Bootstrap -----------------------
 
 
 def main() -> None:
@@ -209,34 +288,31 @@ def main() -> None:
             CommandHandler(os.getenv("BOT_NAME"), start),
             CommandHandler("hi", start),
             CommandHandler("start", start),
+            CommandHandler("today", send_today_prompt),  # manual daily prompts
         ],
         states={
             CHOOSING: [
                 MessageHandler(
-                    filters.Regex("^(Share an Experience)$"), share_experience
+                    filters.Regex(r"^(Share an Experience)$"), share_experience
                 ),
-                MessageHandler(filters.Regex("^(Share a Thought)$"), share_thought),
-                MessageHandler(filters.Regex("^(Share a Photo)$"), share_photo),
+                MessageHandler(filters.Regex(r"^(Share a Thought)$"), share_thought),
+                MessageHandler(filters.Regex(r"^(Share a Photo)$"), share_photo),
                 MessageHandler(
-                    filters.Regex("^(Answer a Reflection Question)$"),
+                    filters.Regex(r"^(Answer a Reflection Question)$"),
                     reflection_question,
                 ),
-                MessageHandler(
-                    filters.Regex("^(Talk Tomorrow)$"),
-                    talk_later,
-                ),
+                MessageHandler(filters.Regex(r"^(Talk Tomorrow)$"), talk_later),
             ],
             PHOTO: [MessageHandler(filters.PHOTO, photo)],
             TYPING_REPLY: [
                 MessageHandler(
-                    filters.TEXT & ~(filters.COMMAND | filters.Regex("^Bye$")),
+                    filters.TEXT & ~(filters.COMMAND | filters.Regex(r"^Bye$")),
                     received_information,
                 )
             ],
         },
-        fallbacks=[MessageHandler(filters.Regex("^Bye$"), done)],
+        fallbacks=[MessageHandler(filters.Regex(r"^Bye$"), done)],
         name="journal-bot",
-        #        persistent=True,
     )
     application.add_handler(conv_handler)
 
