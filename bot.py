@@ -146,7 +146,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     remove_job_if_exists(str(chat_id), context)
 
     reply_text = (
-        f"Hey {update.effective_user.first_name}, I’m {os.getenv('BOT_NAME')} 🙂 "
+        f"Hey there {update.effective_user.first_name}, I’m {os.getenv('BOT_NAME')} 🙂 "
         "Want to share anything from today?"
     )
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
