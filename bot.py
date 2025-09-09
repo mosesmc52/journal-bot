@@ -2,6 +2,7 @@ import logging
 import os
 import random
 from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from conversation import Conversation
 from dotenv import load_dotenv
@@ -41,8 +42,15 @@ markup = ReplyKeyboardMarkup(
     reply_keyboard, one_time_keyboard=True, resize_keyboard=True
 )
 
-
 # ----------------------- Helpers -----------------------
+
+
+def get_tz() -> ZoneInfo:
+    tz = os.getenv("TIMEZONE") or "UTC"
+    try:
+        return ZoneInfo(tz)
+    except Exception:
+        return ZoneInfo("UTC")
 
 
 def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -52,6 +60,53 @@ def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
     for job in jobs:
         job.schedule_removal()
     return True
+
+
+def job_name_for_chat(chat_id: int) -> str:
+    return f"daily-{chat_id}"
+
+
+def parse_hhmm(s: str) -> tuple[int, int] | None:
+    try:
+        hh, mm = s.strip().split(":")
+        h, m = int(hh), int(mm)
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            return h, m
+    except Exception:
+        pass
+    return None
+
+
+def schedule_daily_checkin(
+    context: ContextTypes.DEFAULT_TYPE, chat_id: int, hh: int, mm: int
+) -> None:
+    """
+    Schedules a daily recurring check-in for this chat. Replaces existing job if present.
+    Time is interpreted in the user's TIMEZONE (from .env).
+    """
+    tz = get_tz()
+    name = job_name_for_chat(chat_id)
+    remove_job_if_exists(name, context)
+    context.job_queue.run_daily(
+        initiate_conversation,
+        time=time(hour=hh, minute=mm, tzinfo=tz),
+        chat_id=chat_id,
+        name=name,
+        data={"hh": hh, "mm": mm, "tz": str(tz)},
+    )
+
+
+def ensure_daily_scheduled(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+    """
+    Ensure a daily job exists using either user preference (chat_data['daily_time'])
+    or a sensible default (18:00).
+    """
+    cd = context.chat_data
+    dt = cd.get("daily_time")  # {'hh': int, 'mm': int}
+    if dt is None:
+        dt = {"hh": 18, "mm": 0}
+        cd["daily_time"] = dt
+    schedule_daily_checkin(context, chat_id, dt["hh"], dt["mm"])
 
 
 # Short, friendly prompts (time-aware + anytime)
@@ -101,7 +156,7 @@ def pick_timebox_prompts():
 
 
 def format_daily_prompt(first_name: str) -> str:
-    today = datetime.now().strftime("%b %d")
+    today = datetime.now(get_tz()).strftime("%b %d")
     prompts = pick_timebox_prompts()
     tags = " ".join(random.sample(SUGGESTED_TAGS, k=3))
     return (
@@ -143,7 +198,9 @@ def greeting():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     chat_id = update.effective_message.chat_id
-    remove_job_if_exists(str(chat_id), context)
+
+    # Always (re)ensure a daily schedule on /start
+    ensure_daily_scheduled(context, chat_id)
 
     reply_text = (
         f"Hey there {update.effective_user.first_name}, I’m {os.getenv('BOT_NAME')} 🙂 "
@@ -160,6 +217,52 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(prompt_text, parse_mode="Markdown")
 
     return CHOOSING
+
+
+async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /daily HH:MM — set (or change) the local reminder time.
+    /daily off   — disables the daily reminder.
+    /daily       — shows current time.
+    """
+    chat_id = update.effective_message.chat_id
+    args = context.args or []
+
+    if not args:
+        dt = context.chat_data.get("daily_time")
+        if dt:
+            await update.message.reply_text(
+                f"Your daily reminder is set to {dt['hh']:02d}:{dt['mm']:02d} ({os.getenv('TIMEZONE')})."
+            )
+        else:
+            await update.message.reply_text("No daily reminder set.")
+        return
+
+    arg = " ".join(args).lower().strip()
+    if arg in {"off", "disable", "stop"}:
+        name = job_name_for_chat(chat_id)
+        removed = remove_job_if_exists(name, context)
+        context.chat_data.pop("daily_time", None)
+        if removed:
+            await update.message.reply_text("Daily reminder turned off.")
+        else:
+            await update.message.reply_text("No daily reminder was set.")
+        return
+
+    hhmm = parse_hhmm(arg)
+    if not hhmm:
+        await update.message.reply_text(
+            "Please use `/daily HH:MM` (24h), e.g. `/daily 18:00`.",
+            parse_mode="Markdown",
+        )
+        return
+
+    hh, mm = hhmm
+    context.chat_data["daily_time"] = {"hh": hh, "mm": mm}
+    schedule_daily_checkin(context, chat_id, hh, mm)
+    await update.message.reply_text(
+        f"Got it! I’ll nudge you daily at {hh:02d}:{mm:02d} ({os.getenv('TIMEZONE')})."
+    )
 
 
 async def send_today_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -230,33 +333,43 @@ async def reflection_question(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def initiate_conversation(context: ContextTypes.DEFAULT_TYPE) -> None:
     job = context.job
+    chat_id = job.chat_id
     hello = greeting()
-    await context.bot.send_message(job.chat_id, text=hello, reply_markup=markup)
+    await context.bot.send_message(chat_id, text=hello, reply_markup=markup)
 
     prompt_text = format_daily_prompt(first_name="there")
     conversation.add_content(
         os.getenv("BOT_NAME"), prompt_text, is_bot=True, category="prompt"
     )
-    await context.bot.send_message(job.chat_id, text=prompt_text, parse_mode="Markdown")
+    await context.bot.send_message(chat_id, text=prompt_text, parse_mode="Markdown")
 
 
 async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # schedule tomorrow at 6:00 PM local
+    """
+    Schedule a one-shot for tomorrow 18:00 local AND convert it to the daily recurring time,
+    so you keep getting nudged every day at that time.
+    """
     chat_id = update.effective_message.chat_id
-    now = datetime.now()
+    tz = get_tz()
+    now = datetime.now(tz)
     target = (now + timedelta(days=1)).replace(
         hour=18, minute=0, second=0, microsecond=0
     )
-    seconds_difference = int((target - now).total_seconds())
 
+    seconds_difference = max(0, int((target - now).total_seconds()))
+    # one-shot tomorrow
     context.job_queue.run_once(
         initiate_conversation,
-        seconds_difference,
+        when=seconds_difference,
         chat_id=chat_id,
-        name=str(chat_id),
-        data=seconds_difference,
+        name=f"oneshot-{chat_id}",
+        data={},
     )
-    reply_text = "Cool—I’ll check in tomorrow at 6pm 😊"
+    # persist as daily going forward
+    context.chat_data["daily_time"] = {"hh": 18, "mm": 0}
+    schedule_daily_checkin(context, chat_id, 18, 0)
+
+    reply_text = "Cool—I’ll check in tomorrow at 18:00 and every day after that 😊"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.effective_message.reply_text(reply_text)
 
@@ -273,6 +386,28 @@ async def done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # ----------------------- App Bootstrap -----------------------
 
 
+def restore_schedules_on_startup(application):
+    """
+    When the bot restarts, re-create any daily jobs for chats that
+    have a saved preference in persistence. PTB will load chat_data
+    before we call this (because of PicklePersistence).
+    """
+    # application.chat_data is a dict: {chat_id: dict}
+    for chat_id, cd in application.chat_data.items():
+        try:
+            if (
+                isinstance(chat_id, int)
+                and isinstance(cd, dict)
+                and cd.get("daily_time")
+            ):
+                dt = cd["daily_time"]
+                schedule_daily_checkin(
+                    application.job_queue, chat_id, dt["hh"], dt["mm"]
+                )
+        except Exception as e:
+            logging.warning(f"Failed to restore schedule for chat {chat_id}: {e}")
+
+
 def main() -> None:
     persistence = PicklePersistence(filepath="eva-journal-bot")
 
@@ -282,6 +417,9 @@ def main() -> None:
         .persistence(persistence)
         .build()
     )
+
+    # Restore scheduled jobs for all known chats on startup
+    restore_schedules_on_startup(application)
 
     conv_handler = ConversationHandler(
         entry_points=[
@@ -314,7 +452,11 @@ def main() -> None:
         fallbacks=[MessageHandler(filters.Regex(r"^Bye$"), done)],
         name="journal-bot",
     )
+
     application.add_handler(conv_handler)
+    application.add_handler(
+        CommandHandler("daily", daily)
+    )  # set/see/disable daily reminders
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
