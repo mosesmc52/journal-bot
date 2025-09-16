@@ -218,13 +218,12 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def reflection_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    curated = MORNING_PROMPTS + AFTERNOON_PROMPTS + EVENING_PROMPTS + ANYTIME_CHECKINS
-    question = random.choice(curated)
-    text = f"Here’s one:\n\n{question}"
+    question = conversation.get_reflection_question()
     conversation.add_content(
-        os.getenv("BOT_NAME"), text, category="reflection", is_bot=True
+        os.getenv("BOT_NAME"), question, category="reflection", is_bot=True
     )
-    await update.message.reply_text(text)
+
+    await update.message.reply_text(question)
     return TYPING_REPLY
 
 
