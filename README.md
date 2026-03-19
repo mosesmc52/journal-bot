@@ -42,3 +42,18 @@ init_db()
 
 ### Run Locally
 `python bot.py`
+
+### Daily Journal Prompts
+The bot can now send an automatic daily journal prompt.
+
+- `/start` enables daily prompts for that chat.
+- `Enable Daily Prompt` turns them on again if you paused them.
+- `Disable Daily Prompt` or `/daily_off` turns them off.
+- `/daily_on` turns them back on.
+
+Optional env vars:
+
+- `TIMEZONE=America/Bogota`
+- `DAILY_PROMPT_TIME=18:00`
+
+If `DAILY_PROMPT_TIME` is not set, the bot sends the prompt daily at `18:00`.

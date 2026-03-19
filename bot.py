@@ -1,7 +1,8 @@
 import logging
 import os
 import random
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 from conversation import Conversation
 from dotenv import load_dotenv
@@ -34,7 +35,8 @@ CHOOSING, TYPING_REPLY, TYPING_CHOICE, PHOTO = range(4)
 
 reply_keyboard = [
     ["Share an Experience", "Share a Thought", "Share a Photo"],
-    ["Answer a Reflection Question", "Talk Tomorrow"],
+    ["Answer a Reflection Question", "Enable Daily Prompt"],
+    ["Disable Daily Prompt"],
     ["Bye"],
 ]
 markup = ReplyKeyboardMarkup(
@@ -52,6 +54,57 @@ def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
     for job in jobs:
         job.schedule_removal()
     return True
+
+
+def configured_timezone() -> ZoneInfo | None:
+    timezone_name = os.getenv("TIMEZONE")
+    if not timezone_name:
+        return None
+
+    try:
+        return ZoneInfo(timezone_name)
+    except Exception:
+        logging.warning("Invalid TIMEZONE %r. Falling back to server local time.", timezone_name)
+        return None
+
+
+def configured_daily_prompt_time() -> time:
+    raw_value = os.getenv("DAILY_PROMPT_TIME", "18:00")
+
+    try:
+        hour_text, minute_text = raw_value.split(":", 1)
+        return time(
+            hour=int(hour_text),
+            minute=int(minute_text),
+            tzinfo=configured_timezone(),
+        )
+    except (TypeError, ValueError):
+        logging.warning(
+            "Invalid DAILY_PROMPT_TIME %r. Falling back to 18:00.", raw_value
+        )
+        return time(hour=18, minute=0, tzinfo=configured_timezone())
+
+
+def daily_prompt_job_name(chat_id: int) -> str:
+    return f"daily-prompt:{chat_id}"
+
+
+def schedule_daily_prompt(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+    remove_job_if_exists(daily_prompt_job_name(chat_id), context)
+    context.job_queue.run_daily(
+        initiate_conversation,
+        time=configured_daily_prompt_time(),
+        chat_id=chat_id,
+        name=daily_prompt_job_name(chat_id),
+    )
+
+
+def daily_prompt_status_text() -> str:
+    timezone_name = os.getenv("TIMEZONE") or "server local time"
+    return (
+        f"I’ll send a journal prompt every day at "
+        f"{configured_daily_prompt_time().strftime('%H:%M')} ({timezone_name})."
+    )
 
 
 # Short, friendly prompts (time-aware + anytime)
@@ -143,7 +196,8 @@ def greeting():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     chat_id = update.effective_message.chat_id
-    remove_job_if_exists(str(chat_id), context)
+    context.chat_data["daily_prompt_enabled"] = True
+    schedule_daily_prompt(chat_id, context)
 
     reply_text = (
         f"Hey there {update.effective_user.first_name}, I’m {os.getenv('BOT_NAME')} 🙂 "
@@ -158,6 +212,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         os.getenv("BOT_NAME"), prompt_text, is_bot=True, category="prompt"
     )
     await update.message.reply_text(prompt_text, parse_mode="Markdown")
+    await update.message.reply_text(daily_prompt_status_text(), reply_markup=markup)
 
     return CHOOSING
 
@@ -239,25 +294,29 @@ async def initiate_conversation(context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_message(job.chat_id, text=prompt_text, parse_mode="Markdown")
 
 
-async def talk_later(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # schedule tomorrow at 6:00 PM local
+async def enable_daily_prompt(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
     chat_id = update.effective_message.chat_id
-    now = datetime.now()
-    target = (now + timedelta(days=1)).replace(
-        hour=18, minute=0, second=0, microsecond=0
-    )
-    seconds_difference = int((target - now).total_seconds())
-
-    context.job_queue.run_once(
-        initiate_conversation,
-        seconds_difference,
-        chat_id=chat_id,
-        name=str(chat_id),
-        data=seconds_difference,
-    )
-    reply_text = "Cool—I’ll check in tomorrow at 6pm 😊"
+    context.chat_data["daily_prompt_enabled"] = True
+    schedule_daily_prompt(chat_id, context)
+    reply_text = daily_prompt_status_text()
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
-    await update.effective_message.reply_text(reply_text)
+    await update.effective_message.reply_text(reply_text, reply_markup=markup)
+    return CHOOSING
+
+
+async def disable_daily_prompt(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    chat_id = update.effective_message.chat_id
+    remove_job_if_exists(daily_prompt_job_name(chat_id), context)
+    context.chat_data["daily_prompt_enabled"] = False
+
+    reply_text = "Daily journal prompts are off. Send /start or tap Enable Daily Prompt to turn them back on."
+    conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
+    await update.effective_message.reply_text(reply_text, reply_markup=markup)
+    return CHOOSING
 
 
 async def done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -267,6 +326,19 @@ async def done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(reply_text, reply_markup=ReplyKeyboardRemove())
     user_data.clear()
     return ConversationHandler.END
+
+
+async def restore_daily_prompt_jobs(application) -> None:
+    for chat_id, chat_data in application.chat_data.items():
+        if not chat_data.get("daily_prompt_enabled"):
+            continue
+
+        application.job_queue.run_daily(
+            initiate_conversation,
+            time=configured_daily_prompt_time(),
+            chat_id=chat_id,
+            name=daily_prompt_job_name(chat_id),
+        )
 
 
 # ----------------------- App Bootstrap -----------------------
@@ -279,6 +351,7 @@ def main() -> None:
         ApplicationBuilder()
         .token(os.getenv("TELEGRAM_BOT_TOKEN"))
         .persistence(persistence)
+        .post_init(restore_daily_prompt_jobs)
         .build()
     )
 
@@ -300,7 +373,12 @@ def main() -> None:
                     filters.Regex(r"^(Answer a Reflection Question)$"),
                     reflection_question,
                 ),
-                MessageHandler(filters.Regex(r"^(Talk Tomorrow)$"), talk_later),
+                MessageHandler(
+                    filters.Regex(r"^(Enable Daily Prompt)$"), enable_daily_prompt
+                ),
+                MessageHandler(
+                    filters.Regex(r"^(Disable Daily Prompt)$"), disable_daily_prompt
+                ),
             ],
             PHOTO: [MessageHandler(filters.PHOTO, photo)],
             TYPING_REPLY: [
@@ -314,6 +392,8 @@ def main() -> None:
         name="journal-bot",
     )
     application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("daily_on", enable_daily_prompt))
+    application.add_handler(CommandHandler("daily_off", disable_daily_prompt))
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
