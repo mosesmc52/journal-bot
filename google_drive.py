@@ -1,67 +1,70 @@
 from apiclient import discovery
 from apiclient.http import MediaFileUpload
 from google.oauth2 import service_account
-import googleapiclient.discovery
 
-from utils import ( hex_to_rgb )
+from utils import hex_to_rgb
+
 
 class GoogleDrive(object):
-
     def __init__(self, service_account_file):
         credentials = self._get_credentials(service_account_file)
         self.drive_service = self._get_drive_instance(credentials)
         self.docs_service = self._get_docs_instance(credentials)
 
     def _get_credentials(self, service_account_file):
-
         SCOPES = [
-            'https://www.googleapis.com/auth/drive',
-            'https://www.googleapis.com/auth/documents'
+            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/documents",
         ]
 
         credentials = service_account.Credentials.from_service_account_file(
-                service_account_file, scopes=SCOPES)
+            service_account_file, scopes=SCOPES
+        )
 
         return credentials
 
     def _get_drive_instance(self, credentials):
-        return discovery.build('drive', 'v3', credentials=credentials)
+        return discovery.build("drive", "v3", credentials=credentials)
 
     def _get_docs_instance(self, credentials):
-        return discovery.build('docs', 'v1', credentials=credentials)
+        return discovery.build("docs", "v1", credentials=credentials)
 
     def create_folder(self, name, folder_parent_id):
         folder_metadata = {
-            'name': name,
-            'mimeType': 'application/vnd.google-apps.folder',
-            'parents':[folder_parent_id]
+            "name": name,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [folder_parent_id],
         }
 
         return self.drive_service.files().create(body=folder_metadata).execute()
 
     def upload_media(self, full_filepath, mimetype, folder_parent_id):
         file_metadata = {
-            'name': full_filepath.split('/')[-1],
-            'parents':[folder_parent_id]
+            "name": full_filepath.split("/")[-1],
+            "parents": [folder_parent_id],
         }
 
-        media = MediaFileUpload(full_filepath, mimetype='image/jpeg')
-        return self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        media = MediaFileUpload(full_filepath, mimetype=mimetype)
+        return (
+            self.drive_service.files()
+            .create(body=file_metadata, media_body=media, fields="id,name")
+            .execute()
+        )
 
     def create_document(self, name, folder_parents_id):
         file_metadata = {
-            'name': name,
-            'mimeType':'application/vnd.google-apps.document',
-            'parents':[folder_parents_id]
+            "name": name,
+            "mimeType": "application/vnd.google-apps.document",
+            "parents": [folder_parents_id],
         }
 
         return self.drive_service.files().create(body=file_metadata).execute()
 
     def get_end_cursor_position(self, document_id):
         result = self.docs_service.documents().get(documentId=document_id).execute()
-        return result.get('body')['content'][-1]['endIndex'] - 1
+        return result.get("body")["content"][-1]["endIndex"] - 1
 
-    def write_document(self, document_id, body, is_bold = False, rgb_hex = '000000'):
+    def write_document(self, document_id, body, is_bold=False, rgb_hex="000000"):
         PIXELS_IN_8BIT_COLOR = 256
         body_length = len(body)
         red, green, blue = hex_to_rgb(rgb_hex)
@@ -70,39 +73,42 @@ class GoogleDrive(object):
         end_index = start_index + body_length
 
         requests = [
-             {
-                'insertText': {
-                    'location': {
-                        'index': start_index,
+            {
+                "insertText": {
+                    "location": {
+                        "index": start_index,
                     },
-                    'text': '{}\n\n'.format(body)
+                    "text": "{}\n\n".format(body),
                 },
-
             },
             {
-                'updateTextStyle': {
-                    'textStyle': {
-                        'bold': is_bold,
-                        'weightedFontFamily': {
-                            'fontFamily': 'Arial'
+                "updateTextStyle": {
+                    "textStyle": {
+                        "bold": is_bold,
+                        "weightedFontFamily": {
+                            "fontFamily": "Arial",
                         },
-                        'foregroundColor': {
-                            'color': {
-                                'rgbColor': {
-                                    'red': red/PIXELS_IN_8BIT_COLOR,
-                                    'green': green/PIXELS_IN_8BIT_COLOR,
-                                    'blue': blue/PIXELS_IN_8BIT_COLOR
+                        "foregroundColor": {
+                            "color": {
+                                "rgbColor": {
+                                    "red": red / PIXELS_IN_8BIT_COLOR,
+                                    "green": green / PIXELS_IN_8BIT_COLOR,
+                                    "blue": blue / PIXELS_IN_8BIT_COLOR,
                                 }
                             }
-                        }
+                        },
                     },
-                    'range': {
-                        'startIndex': start_index,
-                        'endIndex': end_index
+                    "range": {
+                        "startIndex": start_index,
+                        "endIndex": end_index,
                     },
-                    'fields': 'bold, weightedFontFamily, foregroundColor'
+                    "fields": "bold, weightedFontFamily, foregroundColor",
                 }
-            }
+            },
         ]
 
-        return self.docs_service.documents().batchUpdate(documentId=document_id, body={'requests': requests}).execute()
+        return (
+            self.docs_service.documents()
+            .batchUpdate(documentId=document_id, body={"requests": requests})
+            .execute()
+        )

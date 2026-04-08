@@ -31,10 +31,11 @@ conversation = Conversation(
     drive_folder_parent_id=os.getenv("GOOGLE_DRIVE_PARENT_FOLDER_ID"),
 )
 
-CHOOSING, TYPING_REPLY, TYPING_CHOICE, PHOTO = range(4)
+CHOOSING, TYPING_REPLY, TYPING_CHOICE, MEDIA = range(4)
 
 reply_keyboard = [
-    ["Share an Experience", "Share a Thought", "Share a Photo"],
+    ["Share an Experience", "Share a Thought"],
+    ["Share a Photo", "Upload Audio"],
     ["Answer a Reflection Question", "Enable Daily Prompt"],
     ["Disable Daily Prompt"],
     ["Bye"],
@@ -256,19 +257,80 @@ async def share_thought(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 async def share_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    reply_text = "Nice! Send it over 📷"
+    context.user_data["expected_media_type"] = "photo"
+    reply_text = "Send a photo."
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text)
-    return PHOTO
+    return MEDIA
 
 
-async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    photo_file = await update.message.photo[-1].get_file()
-    conversation.add_media(photo_file.file_path, "image/jpeg")
-
-    reply_text = "Love it! Want to add a few words?"
+async def share_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["expected_media_type"] = "audio"
+    reply_text = "Send an audio file or voice note."
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
-    await update.message.reply_text(reply_text, reply_markup=markup)
+    await update.message.reply_text(reply_text)
+    return MEDIA
+
+
+def media_filter():
+    return filters.PHOTO | filters.AUDIO | filters.VOICE
+
+
+async def receive_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    message = update.message
+    media_file = None
+    mimetype = None
+    extension = None
+    media_label = "media"
+    received_media_type = None
+    expected_media_type = context.user_data.get("expected_media_type")
+
+    if message.photo:
+        media_file = await message.photo[-1].get_file()
+        mimetype = "image/jpeg"
+        media_label = "photo"
+        received_media_type = "photo"
+        if media_file.file_path and "." in media_file.file_path:
+            extension = media_file.file_path.rsplit(".", 1)[-1]
+    elif message.audio:
+        media_file = await message.audio.get_file()
+        mimetype = message.audio.mime_type or "audio/mpeg"
+        media_label = "audio"
+        received_media_type = "audio"
+        if message.audio.file_name and "." in message.audio.file_name:
+            extension = message.audio.file_name.rsplit(".", 1)[-1]
+    elif message.voice:
+        media_file = await message.voice.get_file()
+        mimetype = message.voice.mime_type or "audio/ogg"
+        media_label = "voice note"
+        received_media_type = "audio"
+        extension = "ogg"
+
+    if not media_file or not mimetype:
+        reply_text = "I can save photos, audio files, and voice notes."
+        await message.reply_text(reply_text, reply_markup=markup)
+        return CHOOSING
+
+    if expected_media_type and received_media_type != expected_media_type:
+        if expected_media_type == "photo":
+            reply_text = "That looks like audio. Tap Share a Photo and send an image."
+        else:
+            reply_text = (
+                "That looks like a photo. Tap Upload Audio and send an audio file or voice note."
+            )
+        await message.reply_text(reply_text, reply_markup=markup)
+        return CHOOSING
+
+    file_bytes = bytes(await media_file.download_as_bytearray())
+    conversation.add_media(file_bytes, mimetype, extension=extension)
+    context.user_data.pop("expected_media_type", None)
+
+    if message.caption:
+        conversation.add_content("me", message.caption, category="media_caption")
+
+    reply_text = f"Saved your {media_label}. Want to add a few words?"
+    conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
+    await message.reply_text(reply_text, reply_markup=markup)
     return CHOOSING
 
 
@@ -368,7 +430,11 @@ def main() -> None:
                     filters.Regex(r"^(Share an Experience)$"), share_experience
                 ),
                 MessageHandler(filters.Regex(r"^(Share a Thought)$"), share_thought),
-                MessageHandler(filters.Regex(r"^(Share a Photo)$"), share_photo),
+                MessageHandler(
+                    filters.Regex(r"^(Share a Photo)$"),
+                    share_photo,
+                ),
+                MessageHandler(filters.Regex(r"^(Upload Audio)$"), share_audio),
                 MessageHandler(
                     filters.Regex(r"^(Answer a Reflection Question)$"),
                     reflection_question,
@@ -379,9 +445,11 @@ def main() -> None:
                 MessageHandler(
                     filters.Regex(r"^(Disable Daily Prompt)$"), disable_daily_prompt
                 ),
+                MessageHandler(media_filter(), receive_media),
             ],
-            PHOTO: [MessageHandler(filters.PHOTO, photo)],
+            MEDIA: [MessageHandler(media_filter(), receive_media)],
             TYPING_REPLY: [
+                MessageHandler(media_filter(), receive_media),
                 MessageHandler(
                     filters.TEXT & ~(filters.COMMAND | filters.Regex(r"^Bye$")),
                     received_information,

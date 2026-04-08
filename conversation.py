@@ -1,11 +1,12 @@
 import os
 import random
-from datetime import datetime, timedelta
+import tempfile
+from datetime import datetime
+from mimetypes import guess_extension
 
 import giphy_client
 import gspread
 import models
-import requests
 import sqlalchemy
 from giphy_client.rest import ApiException as GiphyApiException
 from google_drive import GoogleDrive
@@ -117,21 +118,40 @@ class Conversation(object):
         self.db_session.add(conversation)
         self.db_session.commit()
 
-    def add_media(self, url, mimetype):
+    def add_media(self, file_bytes, mimetype, extension=None):
         folder = self._get_folder()
 
-        # upload possible media
-        r = requests.get(url, allow_redirects=True)
+        media_directory = "./media"
+        os.makedirs(media_directory, exist_ok=True)
+
+        if not extension:
+            guessed_extension = guess_extension(mimetype, strict=False) or ""
+            extension = guessed_extension.lstrip(".") or mimetype.split("/")[-1]
 
         file_name = "{}.{}".format(
-            datetime.now().strftime("%b-%-d-%Y-%-I-%M-%p"), mimetype.split("/")[-1]
+            datetime.now().strftime("%b-%-d-%Y-%-I-%M-%S-%p"), extension
         )
-        full_file_path = "./media/{}".format(file_name)
-        open(full_file_path, "wb").write(r.content)
-        response = self.goog_drive.upload_media(
-            full_file_path, mimetype, folder.goog_id
+
+        with tempfile.NamedTemporaryFile(
+            dir=media_directory, suffix=f".{extension}", delete=False
+        ) as temp_file:
+            temp_file.write(file_bytes)
+            full_file_path = temp_file.name
+
+        try:
+            os.replace(full_file_path, os.path.join(media_directory, file_name))
+            full_file_path = os.path.join(media_directory, file_name)
+            response = self.goog_drive.upload_media(
+                full_file_path, mimetype, folder.goog_id
+            )
+        finally:
+            if os.path.exists(full_file_path):
+                os.remove(full_file_path)
+
+        media_type = mimetype.split("/")[0]
+        self.add_content(
+            "me", f"Uploaded {media_type}: {file_name}", category="media"
         )
-        os.remove(full_file_path)
 
         # add media  to sqllite
         media = models.Media(name=file_name, goog_id=response.get("id"))

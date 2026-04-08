@@ -43,6 +43,13 @@ init_db()
 ### Run Locally
 `python bot.py`
 
+### Media Uploads
+The bot can save media you send in Telegram.
+
+- Use `Upload Photo or Audio` from the keyboard, or just send the file directly.
+- Supported uploads: photos, audio files, and Telegram voice notes.
+- Uploaded media is stored in the configured Google Drive folder and logged in the daily journal record.
+
 ### Daily Journal Prompts
 The bot can now send an automatic daily journal prompt.
 
