@@ -1,7 +1,9 @@
+import json
 import os
 import random
+import re
 import tempfile
-from datetime import datetime
+from datetime import datetime, time, timedelta, timezone
 from mimetypes import guess_extension
 
 import giphy_client
@@ -92,6 +94,16 @@ class Conversation(object):
 
         return doc
 
+    def _next_media_sequence_for_day(self, day):
+        start = datetime.combine(day, time.min)
+        end = start + timedelta(days=1)
+        count = (
+            self.db_session.query(models.Media)
+            .filter(models.Media.date >= start, models.Media.date < end)
+            .count()
+        )
+        return count + 1
+
     def add_content(self, speaker, message, category="", is_bot=False):
         folder = self._get_folder()
 
@@ -128,6 +140,11 @@ class Conversation(object):
             guessed_extension = guess_extension(mimetype, strict=False) or ""
             extension = guessed_extension.lstrip(".") or mimetype.split("/")[-1]
 
+        now_local = datetime.now()
+        sequence = self._next_media_sequence_for_day(now_local.date())
+        sequence_text = f"{sequence:03d}"
+        media_id = f"{now_local.strftime('%Y%m%d')}_{sequence_text}"
+
         file_name = "{}.{}".format(
             datetime.now().strftime("%b-%-d-%Y-%-I-%M-%S-%p"), extension
         )
@@ -157,6 +174,51 @@ class Conversation(object):
         media = models.Media(name=file_name, goog_id=response.get("id"))
         self.db_session.add(media)
         self.db_session.commit()
+
+        media_type_folder = "photos" if media_type == "image" else "audio"
+        file_path = f"{media_type_folder}/{now_local.strftime('%Y/%m')}/img_{sequence_text}.{extension}"
+        uploaded_at = (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+
+        return {
+            "media_id": media_id,
+            "media": mimetype,
+            "file_path": file_path,
+            "uploaded_at": uploaded_at,
+            "journal_date": now_local.date().isoformat(),
+            "tags": [],
+            "folder_id": folder.goog_id,
+        }
+
+    def append_media_metadata(self, metadata, note):
+        cleaned_note = (note or "").strip()
+        entry = {
+            "media_id": metadata.get("media_id"),
+            "media": metadata.get("media"),
+            "file_path": metadata.get("file_path"),
+            "uploaded_at": metadata.get("uploaded_at"),
+            "journal_date": metadata.get("journal_date"),
+            "note": cleaned_note,
+            "tags": self._extract_tags(cleaned_note),
+        }
+        self.goog_drive.append_jsonl(
+            folder_parent_id=metadata.get("folder_id"),
+            file_name="metadata.jsonl",
+            line=json.dumps(entry, ensure_ascii=False),
+        )
+        return entry
+
+    def _extract_tags(self, note):
+        tags = []
+        for match in re.finditer(r"#([A-Za-z0-9_]+)", note or ""):
+            tag = match.group(1).lower()
+            if tag not in tags:
+                tags.append(tag)
+        return tags
 
     def add_content_to_tranining_data(self, speaker, message):
         with open(self.training_data_file, "a+") as myfile:

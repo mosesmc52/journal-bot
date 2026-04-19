@@ -243,6 +243,7 @@ async def received_information(
 
 
 async def share_experience(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("pending_photo_metadata", None)
     reply_text = "How’s your day been?"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text)
@@ -250,6 +251,7 @@ async def share_experience(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def share_thought(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("pending_photo_metadata", None)
     reply_text = "What’s on your mind?"
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text)
@@ -257,6 +259,7 @@ async def share_thought(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 async def share_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("pending_photo_metadata", None)
     context.user_data["expected_media_type"] = "photo"
     reply_text = "Send a photo."
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
@@ -265,6 +268,7 @@ async def share_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 
 async def share_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("pending_photo_metadata", None)
     context.user_data["expected_media_type"] = "audio"
     reply_text = "Send an audio file or voice note."
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
@@ -322,19 +326,49 @@ async def receive_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         return CHOOSING
 
     file_bytes = bytes(await media_file.download_as_bytearray())
-    conversation.add_media(file_bytes, mimetype, extension=extension)
+    metadata = conversation.add_media(file_bytes, mimetype, extension=extension)
     context.user_data.pop("expected_media_type", None)
 
     if message.caption:
         conversation.add_content("me", message.caption, category="media_caption")
 
-    reply_text = f"Saved your {media_label}. Want to add a few words?"
+    if received_media_type == "photo":
+        context.user_data["pending_photo_metadata"] = metadata
+        reply_text = "Saved your photo. Reply with a comment (add #tags if you want) and I’ll append it to metadata.jsonl."
+    else:
+        reply_text = f"Saved your {media_label}. Want to add a few words?"
+
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await message.reply_text(reply_text, reply_markup=markup)
     return CHOOSING
 
 
+async def handle_text_in_choosing(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    pending_metadata = context.user_data.get("pending_photo_metadata")
+    if not pending_metadata:
+        return await received_information(update, context)
+
+    note = (update.message.text or "").strip()
+    if not note:
+        await update.message.reply_text(
+            "Please send a short comment for that photo.", reply_markup=markup
+        )
+        return CHOOSING
+
+    conversation.add_content("me", note, category="media_note")
+    conversation.append_media_metadata(pending_metadata, note)
+    context.user_data.pop("pending_photo_metadata", None)
+
+    reply_text = "Comment saved. I appended this photo entry to metadata.jsonl in this month’s Drive folder."
+    conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
+    await update.message.reply_text(reply_text, reply_markup=markup)
+    return CHOOSING
+
+
 async def reflection_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.pop("pending_photo_metadata", None)
     question = conversation.get_reflection_question()
     conversation.add_content(
         os.getenv("BOT_NAME"), question, category="reflection", is_bot=True
@@ -446,6 +480,10 @@ def main() -> None:
                     filters.Regex(r"^(Disable Daily Prompt)$"), disable_daily_prompt
                 ),
                 MessageHandler(media_filter(), receive_media),
+                MessageHandler(
+                    filters.TEXT & ~(filters.COMMAND | filters.Regex(r"^Bye$")),
+                    handle_text_in_choosing,
+                ),
             ],
             MEDIA: [MessageHandler(media_filter(), receive_media)],
             TYPING_REPLY: [

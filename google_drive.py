@@ -1,5 +1,7 @@
+import io
+
 from apiclient import discovery
-from apiclient.http import MediaFileUpload
+from apiclient.http import MediaFileUpload, MediaIoBaseUpload
 from google.oauth2 import service_account
 
 from utils import hex_to_rgb
@@ -110,5 +112,57 @@ class GoogleDrive(object):
         return (
             self.docs_service.documents()
             .batchUpdate(documentId=document_id, body={"requests": requests})
+            .execute()
+        )
+
+    def _find_file_in_folder(self, folder_parent_id, file_name):
+        query = (
+            f"name='{file_name}' and '{folder_parent_id}' in parents and trashed=false"
+        )
+        response = (
+            self.drive_service.files()
+            .list(q=query, spaces="drive", fields="files(id,name)", pageSize=1)
+            .execute()
+        )
+        files = response.get("files", [])
+        return files[0] if files else None
+
+    def _create_text_file(self, folder_parent_id, file_name, content):
+        file_metadata = {
+            "name": file_name,
+            "parents": [folder_parent_id],
+            "mimeType": "text/plain",
+        }
+        media = MediaIoBaseUpload(
+            io.BytesIO(content.encode("utf-8")),
+            mimetype="text/plain",
+            resumable=False,
+        )
+        return (
+            self.drive_service.files()
+            .create(body=file_metadata, media_body=media, fields="id,name")
+            .execute()
+        )
+
+    def append_jsonl(self, folder_parent_id, file_name, line):
+        normalized_line = line.rstrip("\n") + "\n"
+        file_info = self._find_file_in_folder(folder_parent_id, file_name)
+
+        if not file_info:
+            return self._create_text_file(folder_parent_id, file_name, normalized_line)
+
+        existing_bytes = (
+            self.drive_service.files().get_media(fileId=file_info["id"]).execute()
+        )
+        existing_content = existing_bytes.decode("utf-8") if existing_bytes else ""
+
+        media = MediaIoBaseUpload(
+            io.BytesIO((existing_content + normalized_line).encode("utf-8")),
+            mimetype="text/plain",
+            resumable=False,
+        )
+        return (
+            self.drive_service.files()
+            .update(fileId=file_info["id"], media_body=media, fields="id,name")
             .execute()
         )
