@@ -32,6 +32,12 @@ docker-compose -f docker-compose.yml up
 docker-compose -f docker-compose.yml up -d
 ```
 
+`ollama-pull` now runs automatically on `docker-compose up` and pulls `OLLAMA_MODEL` one time before the bot starts.
+To manually refresh or pull a different model:
+```
+docker-compose -f docker-compose.yml run --rm ollama-pull
+```
+
 #### Create SQLlite DB
 1) open python in terminal
 2) Insert the following commands
@@ -42,6 +48,27 @@ init_db()
 
 ### Run Locally
 `python bot.py`
+
+### AI Reflect-Then-Ask (Ollama + Qwen3)
+The bot can use a local Ollama model for replies in a reflect-then-ask format:
+
+- Line 1: mirror the user point in one sentence
+- Line 2: ask one focused open-ended question
+
+Setup:
+
+```bash
+ollama pull qwen3:8b
+```
+
+Optional env vars:
+
+- `OLLAMA_BASE_URL=http://localhost:11434`
+- `OLLAMA_MODEL=qwen3:8b`
+
+Docker note:
+
+- In Docker Compose, set `OLLAMA_BASE_URL=http://ollama:11434` so the bot reaches the Ollama service container.
 
 ### Media Uploads
 The bot can save media you send in Telegram.

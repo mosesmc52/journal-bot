@@ -2,9 +2,47 @@ services:
   web:
     build: .
     command: python bot.py
+    depends_on:
+      ollama:
+        condition: service_started
+      ollama-pull:
+        condition: service_completed_successfully
     volumes:
       - ./journal.sqlite:/app/journal.sqlite
       - ./conversation.txt:/app/conversation.txt
       - ./service-account.json:/app/service-account.json
     env_file:
       - ./.env
+    environment:
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_started
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        until ollama list >/dev/null 2>&1; do
+          sleep 2
+        done
+        ollama pull "$$OLLAMA_MODEL"
+
+volumes:
+  ollama_data:

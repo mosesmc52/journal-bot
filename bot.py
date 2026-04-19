@@ -1,9 +1,12 @@
 import logging
 import os
 import random
+import re
+from asyncio import to_thread
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
+import requests
 from conversation import Conversation
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
@@ -43,6 +46,9 @@ reply_keyboard = [
 markup = ReplyKeyboardMarkup(
     reply_keyboard, one_time_keyboard=True, resize_keyboard=True
 )
+
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 
 
 # ----------------------- Helpers -----------------------
@@ -192,6 +198,74 @@ def greeting():
         )
 
 
+def _first_sentences(text: str):
+    return [part.strip() for part in re.findall(r"[^.!?]+[.!?]", text or "") if part.strip()]
+
+
+def _enforce_reflect_then_ask(raw_text: str) -> str:
+    sentences = _first_sentences(raw_text)
+    reflection = None
+    question = None
+
+    for sentence in sentences:
+        if sentence.endswith("?") and not question:
+            question = sentence
+        if not sentence.endswith("?") and not reflection:
+            reflection = sentence
+        if reflection and question:
+            break
+
+    if not reflection:
+        reflection = "I hear what you are saying."
+    if not question:
+        question = "What feels most important about this for you right now?"
+    elif not question.endswith("?"):
+        question = question.rstrip(".!") + "?"
+
+    return f"{reflection}\n{question}"
+
+
+def _ollama_reflect_then_ask_sync(user_text: str) -> str:
+    system_prompt = (
+        "You are a journaling companion. Follow the reflect-then-ask pattern.\n"
+        "Return exactly two lines:\n"
+        "1) One short reflection sentence that mirrors the user's point.\n"
+        "2) One focused, open-ended question.\n"
+        "Keep warm, concise, and practical."
+    )
+    payload = {
+        "model": OLLAMA_MODEL,
+        "system": system_prompt,
+        "prompt": f"User message: {user_text}",
+        "stream": False,
+        "options": {
+            "temperature": 0.5,
+        },
+    }
+    response = requests.post(
+        f"{OLLAMA_BASE_URL}/api/generate",
+        json=payload,
+        timeout=20,
+    )
+    response.raise_for_status()
+    result = response.json().get("response", "").strip()
+    if not result:
+        raise ValueError("Empty response from Ollama")
+    return _enforce_reflect_then_ask(result)
+
+
+async def generate_reflect_then_ask(user_text: str) -> str:
+    try:
+        return await to_thread(_ollama_reflect_then_ask_sync, user_text)
+    except Exception as exc:
+        logging.warning("Ollama reflect-then-ask failed: %s", exc)
+        return (
+            "Thanks for sharing that."
+            "\n"
+            "What part of this would you like to explore a little more?"
+        )
+
+
 # ----------------------- Handlers -----------------------
 
 
@@ -235,7 +309,7 @@ async def received_information(
     answer = update.message.text
     conversation.add_content("me", answer)
 
-    reply_text = "Got it 😊 Add anything else?"
+    reply_text = await generate_reflect_then_ask(answer)
     conversation.add_content(os.getenv("BOT_NAME"), reply_text, is_bot=True)
     await update.message.reply_text(reply_text, reply_markup=markup)
 
