@@ -65,12 +65,14 @@ def configured_timezone() -> ZoneInfo | None:
     try:
         return ZoneInfo(timezone_name)
     except Exception:
-        logging.warning("Invalid TIMEZONE %r. Falling back to server local time.", timezone_name)
+        logging.warning(
+            "Invalid TIMEZONE %r. Falling back to server local time.", timezone_name
+        )
         return None
 
 
 def configured_daily_prompt_time() -> time:
-    raw_value = os.getenv("DAILY_PROMPT_TIME", "18:00")
+    raw_value = os.getenv("DAILY_PROMPT_TIME", "21:00")
 
     try:
         hour_text, minute_text = raw_value.split(":", 1)
@@ -319,9 +321,7 @@ async def receive_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         if expected_media_type == "photo":
             reply_text = "That looks like audio. Tap Share a Photo and send an image."
         else:
-            reply_text = (
-                "That looks like a photo. Tap Upload Audio and send an audio file or voice note."
-            )
+            reply_text = "That looks like a photo. Tap Upload Audio and send an audio file or voice note."
         await message.reply_text(reply_text, reply_markup=markup)
         return CHOOSING
 
@@ -491,7 +491,7 @@ def main() -> None:
                 MessageHandler(
                     filters.TEXT & ~(filters.COMMAND | filters.Regex(r"^Bye$")),
                     received_information,
-                )
+                ),
             ],
         },
         fallbacks=[MessageHandler(filters.Regex(r"^Bye$"), done)],
